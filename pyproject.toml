@@ -1,0 +1,13 @@
+[project]
+name = "prompt2gdpr-v2"
+version = "0.1.0"
+description = "Agentic GDPR Article 5(1)(b) Purpose Limitation Compliance Workflow"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "json-repair>=0.25.0",
+    "openai>=1.0.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "rapidfuzz>=3.0.0",
+]

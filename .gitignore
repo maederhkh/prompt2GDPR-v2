@@ -1,0 +1,22 @@
+# Environment — never commit secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.python-version
+
+# Pipeline outputs (can be large and are reproducible)
+output/results/
+
+# IDE
+.vscode/
+.idea/
+*.swp

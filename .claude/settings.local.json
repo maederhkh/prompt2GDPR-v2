@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(uv init:*)",
+      "Bash(powershell -Command \"Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression\")",
+      "Bash(powershell -ExecutionPolicy Bypass -Command \"Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression\")",
+      "Bash(export PATH=\"$PATH:/c/Users/SAZGAR/.local/bin\")",
+      "Bash(pip install:*)",
+      "Bash(python -c ':*)",
+      "Bash(python main.py --help)"
+    ]
+  }
+}
