@@ -78,8 +78,81 @@ Return ONLY valid JSON matching this exact schema. No prose, no markdown, no exp
 
 
 def build_extractor_prompt(policy_name: str, policy_text: str) -> str:
-    """Return the formatted user prompt for the Extractor agent."""
+    """Return the formatted user prompt for the Extractor agent (single-pass fallback)."""
     return EXTRACTOR_USER_TEMPLATE.format(
         policy_name=policy_name,
         policy_text=policy_text,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Section-level extraction prompt (used in two-pass mode, Pass 2)
+# ---------------------------------------------------------------------------
+
+SECTION_EXTRACTOR_USER_TEMPLATE = """\
+## Task
+Extract every clause relevant to GDPR Article 5(1)(b) — purpose limitation — \
+from the policy section below.
+
+## What to extract
+Look specifically for:
+1. Stated processing purposes (what the data is used for)
+2. Legal basis references linked to a specific purpose
+3. Secondary or further use of already-collected data
+4. Third-party data sharing with stated purposes
+5. Research, analytics, profiling, or product development purposes
+6. Article 89 GDPR exceptions (scientific/historical research, archiving, statistics)
+
+## Rules
+- Quote each clause **verbatim** — copy the exact words from the policy.
+- **Quote the complete paragraph**, not just the sentence that states the purpose. \
+If the purpose statement is followed by a legal basis, safeguard description, or \
+condition in the same paragraph, include all of it in the quote.
+- Do not paraphrase, summarise, or combine multiple clauses.
+- If the section contains no purpose limitation content, return an empty \
+"extracted_clauses" list.
+- Start clause IDs from C{clause_id_start} (e.g. C{clause_id_start}, \
+C{clause_id_start_plus_1}, ...).
+
+## relevance_type values
+- stated_purpose — directly states what data is collected or processed for
+- legal_basis — states the legal basis tied to a specific purpose
+- secondary_use — further processing beyond the original collection purpose
+- third_party — data sharing with third parties, including the purpose
+- research_exception — invokes Article 89 exceptions
+- other — relevant to purpose limitation but does not fit the above
+
+## Output format
+Return ONLY valid JSON. No prose, no markdown, no explanation.
+
+{{
+  "extracted_clauses": [
+    {{
+      "clause_id": "C{clause_id_start}",
+      "quote": "<verbatim paragraph text from the policy>",
+      "section_reference": "{section_name}",
+      "relevance_type": "<stated_purpose | legal_basis | secondary_use | third_party | research_exception | other>"
+    }}
+  ]
+}}
+
+---
+
+## Section: {section_name}
+
+{section_text}
+"""
+
+
+def build_section_extractor_prompt(
+    section_name: str,
+    section_text: str,
+    clause_id_start: int,
+) -> str:
+    """Return the formatted user prompt for section-level extraction (Pass 2)."""
+    return SECTION_EXTRACTOR_USER_TEMPLATE.format(
+        section_name=section_name,
+        section_text=section_text,
+        clause_id_start=clause_id_start,
+        clause_id_start_plus_1=clause_id_start + 1,
     )

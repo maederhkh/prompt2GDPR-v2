@@ -77,6 +77,12 @@ without full safeguard specification.
 (e.g. "to improve services", "for business purposes"); further processing incompatible \
 with original purpose without justification; or Article 89 invoked without any safeguards.
 
+**IMPORTANT — no other labels are permitted.** You must use exactly one of: \
+"Compliant", "Partially Compliant", or "Non-Compliant". \
+Do NOT use "Not Applicable", "N/A", or any other value. \
+Every clause that was extracted and verified is relevant to purpose limitation; \
+if a clause contains no purpose limitation language at all, label it "Non-Compliant".
+
 ### Overall policy label (derived from clause labels)
 - All clauses Compliant → **Compliant**
 - Mix of Compliant + Partially Compliant (no Non-Compliant) → **Partially Compliant**

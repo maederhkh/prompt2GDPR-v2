@@ -8,7 +8,10 @@
       "Bash(export PATH=\"$PATH:/c/Users/SAZGAR/.local/bin\")",
       "Bash(pip install:*)",
       "Bash(python -c ':*)",
-      "Bash(python main.py --help)"
+      "Bash(python main.py --help)",
+      "Bash(C:/Users/SAZGAR/AppData/Local/Programs/Python/Python313/python.exe main.py --policy data/policies/policy_long.txt)",
+      "WebFetch(domain:openrouter.ai)",
+      "WebSearch"
     ]
   }
 }

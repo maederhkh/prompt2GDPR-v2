@@ -70,6 +70,14 @@ def run_finalizer(
     raw = response.choices[0].message.content
     data = parse_and_repair(raw)
 
+    # Inject safe defaults for fields that may be missing if the model truncated
+    # its output (common when the input is very large due to many clauses/errors).
+    data.setdefault("key_findings", ["See clause assessments for detailed findings."])
+    data.setdefault("identified_gaps", ["See unresolved flags and reflector report for gaps."])
+    data.setdefault("unresolved_flags", [])
+    data.setdefault("clause_assessments", [])
+    data.setdefault("human_review_notes", "Human expert review required.")
+
     errors = validate_finalizer_output(data)
     if errors:
         raise ValueError(

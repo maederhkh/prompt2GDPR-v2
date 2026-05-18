@@ -21,6 +21,7 @@ from utils.schema_validator import parse_and_repair, validate_evaluator_output
 from utils.legal_tools import LEGAL_TOOLS, execute_tool_call, ref_source_type
 
 MAX_TOOL_ITERATIONS = 6   # safety cap on the tool-calling loop
+EVALUATOR_BATCH_SIZE = 15  # max clauses per LLM call — prevents output truncation
 
 
 def run_evaluator(
@@ -55,6 +56,14 @@ def run_evaluator(
             "Evaluator received no verified clauses. "
             "Cannot perform assessment without policy evidence."
         )
+
+    # ------------------------------------------------------------------
+    # Batching: if there are more clauses than EVALUATOR_BATCH_SIZE,
+    # split into chunks and merge results. This prevents output truncation
+    # when the two-pass extractor returns many clauses from a long policy.
+    # ------------------------------------------------------------------
+    if len(verified_clauses) > EVALUATOR_BATCH_SIZE:
+        return _run_batched_evaluator(client, verified_clauses, model, retry_instructions)
 
     user_prompt = build_evaluator_prompt(verified_clauses)
 
@@ -173,3 +182,98 @@ def run_evaluator(
     data["tools_called"] = tools_called
 
     return data
+
+
+# ---------------------------------------------------------------------------
+# Batched evaluation — used when clause count exceeds EVALUATOR_BATCH_SIZE
+# ---------------------------------------------------------------------------
+
+def _run_batched_evaluator(
+    client: OpenAI,
+    verified_clauses: list[dict],
+    model: str,
+    retry_instructions: str | None,
+) -> dict:
+    """
+    Split verified_clauses into batches of EVALUATOR_BATCH_SIZE, evaluate
+    each batch independently, then merge all evaluations into a single output.
+
+    The overall_label is derived from the merged clause-level labels:
+      - Any Non-Compliant  → overall Non-Compliant
+      - Mix of Compliant + Partially Compliant → overall Partially Compliant
+      - All Compliant → overall Compliant
+    """
+    total = len(verified_clauses)
+    batches = [
+        verified_clauses[i:i + EVALUATOR_BATCH_SIZE]
+        for i in range(0, total, EVALUATOR_BATCH_SIZE)
+    ]
+    print(f"  [Evaluator] {total} clauses -> {len(batches)} batch(es) of "
+          f"up to {EVALUATOR_BATCH_SIZE} each.")
+
+    all_evaluations: list[dict] = []
+    all_references: list[dict] = []
+    all_tools_called: list[dict] = []
+
+    for batch_idx, batch in enumerate(batches, start=1):
+        ids = [c.get("clause_id", "?") for c in batch]
+        print(f"    [Evaluator] Batch {batch_idx}/{len(batches)}: "
+              f"{ids[0]}–{ids[-1]} ({len(batch)} clauses)")
+
+        batch_result = run_evaluator(
+            client=client,
+            verified_clauses=batch,
+            model=model,
+            retry_instructions=retry_instructions,
+        )
+
+        all_evaluations.extend(batch_result.get("evaluations", []))
+        all_references.extend(batch_result.get("references_used", []))
+        all_tools_called.extend(batch_result.get("tools_called", []))
+
+    # Derive overall label from clause-level labels
+    labels = [e.get("clause_label", "") for e in all_evaluations]
+    if "Non-Compliant" in labels:
+        overall_label = "Non-Compliant"
+    elif "Partially Compliant" in labels:
+        overall_label = "Partially Compliant"
+    else:
+        overall_label = "Compliant"
+
+    non_count = labels.count("Non-Compliant")
+    partial_count = labels.count("Partially Compliant")
+    compliant_count = labels.count("Compliant")
+    overall_justification = (
+        f"Batched evaluation of {total} clauses across {len(batches)} batch(es). "
+        f"Label breakdown: {compliant_count} Compliant, "
+        f"{partial_count} Partially Compliant, {non_count} Non-Compliant. "
+        f"Overall label derived from clause-level labels per purpose limitation rules."
+    )
+
+    # Deduplicate references by reference_id
+    seen_refs: set[str] = set()
+    unique_refs: list[dict] = []
+    for ref in all_references:
+        rid = ref.get("reference_id", "")
+        if rid not in seen_refs:
+            seen_refs.add(rid)
+            unique_refs.append(ref)
+
+    merged = {
+        "evaluations": all_evaluations,
+        "overall_label": overall_label,
+        "overall_justification": overall_justification,
+        "references_used": unique_refs,
+        "tools_called": all_tools_called,
+        "_batched": True,
+        "_batch_count": len(batches),
+    }
+
+    errors = validate_evaluator_output(merged)
+    if errors:
+        raise ValueError(
+            "Batched evaluator output failed validation:\n"
+            + "\n".join(f"  - {e}" for e in errors)
+        )
+
+    return merged

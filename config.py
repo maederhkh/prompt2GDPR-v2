@@ -17,23 +17,35 @@ Examples:
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# Global default — used when no per-agent model is specified.
+# Global default — used as a last-resort fallback only.
+# In normal operation every agent has an explicit model set in DEFAULT_AGENT_MODELS.
 DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
-# Per-agent model overrides. Set to None to inherit DEFAULT_MODEL.
-# Override these via --model-extractor / --model-evaluator / etc. on the CLI.
+# Per-agent model assignments.
+# Each agent is assigned a model chosen for its specific role:
+#
+#   scout       — Gemini Flash 3: cheap, fast section identification (no complex reasoning needed)
+#   extractor   — GPT 5.3:        strong instruction following for complete paragraph quoting
+#   evaluator   — Grok 4.1:       independent reasoning style, complements GPT on legal assessment
+#   reflector_a — Claude Sonnet 4.5: first independent auditor
+#   reflector_b — GPT 5.3:        second auditor with different style from evaluator (Grok)
+#   finalizer   — Claude Sonnet 4.5: reliable structured output generation
+#
+# Override any of these at runtime via CLI flags (see main.py --help).
 DEFAULT_AGENT_MODELS = {
-    "extractor":   None,
-    "evaluator":   None,
-    "reflector_a": None,
-    "reflector_b": None,
-    "finalizer":   None,
+    "scout":       "google/gemini-3-flash-preview",  # Gemini Flash — cheap + fast section ID
+    "extractor":   "openai/gpt-5.3-chat",            # GPT-5.3 — strong instruction following
+    "evaluator":   "x-ai/grok-4.1-fast",             # Grok 4.1 — independent reasoning style
+    "reflector_a": "anthropic/claude-sonnet-4.5",    # Claude Sonnet 4.5 — first auditor
+    "reflector_b": "openai/gpt-5.3-chat",            # GPT-5.3 — second auditor (different from Grok)
+    "finalizer":   "anthropic/claude-sonnet-4.5",    # Claude Sonnet 4.5 — structured output
 }
 
 # Per-agent token budgets (max_tokens sent to the API)
 MAX_TOKENS = {
+    "scout":     1024,    # Scout only returns a list of section headings — small output
     "extractor": 4096,
-    "evaluator": 6000,
-    "reflector": 4096,
-    "finalizer": 6000,
+    "evaluator": 16000,   # Raised: two-pass extraction can yield 50–100 clauses; each needs full rubric
+    "reflector": 8000,    # Raised: more clauses means a longer reflector review
+    "finalizer": 8000,    # Raised: final report over many clauses can be long
 }

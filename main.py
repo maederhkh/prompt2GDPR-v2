@@ -32,7 +32,7 @@ from utils.reflector_merge import merge_reflector_outputs
 from agents.finalizer import run_finalizer
 from config import DEFAULT_MODEL, DEFAULT_AGENT_MODELS, OPENROUTER_BASE_URL
 from utils.verifier import verify_clauses
-from evaluation.metrics import compute_all_metrics, m3_label_stability
+from utils.report_generator import generate_report
 
 MAX_RETRIES = 2
 
@@ -64,7 +64,11 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
     # Step 1: Extractor (Agent 1)
     # ------------------------------------------------------------------
     print("\n[Agent 1] Extractor — identifying purpose limitation clauses...")
-    extractor_output = run_extractor(client, policy_name, policy_text, model=agent_models["extractor"])
+    extractor_output = run_extractor(
+        client, policy_name, policy_text,
+        model=agent_models["extractor"],
+        scout_model=agent_models["scout"],
+    )
     clause_count = len(extractor_output.get("extracted_clauses", []))
     print(f"  Extracted {clause_count} clause(s).")
 
@@ -140,7 +144,9 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
                 print(f"    Re-running Agent 1 ({len(agent1_errors)} error(s))...")
                 extractor_output = run_extractor(
                     client, policy_name, policy_text,
-                    model=agent_models["extractor"], retry_instructions=instructions
+                    model=agent_models["extractor"],
+                    scout_model=agent_models["scout"],
+                    retry_instructions=instructions,
                 )
                 verified_clauses, flagged_clauses = verify_clauses(
                     extractor_output.get("extracted_clauses", []), policy_text
@@ -202,23 +208,6 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
     print(f"  Final label: {finalizer_output.get('overall_label')} "
           f"(confidence: {finalizer_output.get('confidence')})")
 
-    # ------------------------------------------------------------------
-    # Step 6: Evaluation metrics
-    # ------------------------------------------------------------------
-    print("\n[Metrics] Computing M1–M5...")
-    metrics = compute_all_metrics(
-        extractor_output=extractor_output,
-        verified_clauses=verified_clauses,
-        flagged_clauses=flagged_clauses,
-        evaluator_output=evaluator_output,
-        reflector_a_initial=reflector_a_initial,
-        reflector_b_initial=reflector_b_initial,
-        initial_reflector_output=initial_reflector_output,
-        final_reflector_output=final_reflector_output,
-        finalizer_output=finalizer_output,
-    )
-    _print_metrics(metrics)
-
     return {
         "policy_name": policy_name,
         "extractor_output": extractor_output,
@@ -231,37 +220,30 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
         "final_reflector_output": final_reflector_output,       # merged after retries
         "retry_count": retry_count,
         "finalizer_output": finalizer_output,
-        "metrics": metrics,
     }
 
 
-def _print_metrics(metrics: dict) -> None:
-    m1 = metrics.get("M1_rubric_alignment", {})
-    m2 = metrics.get("M2_evidence_grounding", {})
-    m4 = metrics.get("M4_structural_completeness", {})
-    m5 = metrics.get("M5_reflector_correction_rate", {})
-
-    print(f"  M1 Rubric Alignment:       {m1.get('overall_score', 0):.2%}")
-    print(f"  M2 Verifier Pass Rate:     {m2.get('verifier_pass_rate', 0):.2%}  "
-          f"| Evaluator Grounding: {m2.get('evaluator_grounding_rate', 0):.2%}")
-    print(f"  M4 Structural Completeness:{m4.get('overall_score', 0):.2%}")
-    print(f"  M5 Reflector Correction:   {m5.get('correction_rate', 0):.2%}  "
-          f"(resolved {m5.get('resolved_count', 0)}/{m5.get('initial_error_count', 0)})  "
-          f"| Agreement: {m5.get('agreement_rate', 1.0):.2%}")
 
 
 def save_result(result: dict, output_dir: Path, run_index: int = 1) -> Path:
-    """Save a run result to a JSON file and return the file path."""
+    """Save a run result to a JSON file and a markdown report, return the JSON path."""
     output_dir.mkdir(parents=True, exist_ok=True)
     policy_name = result.get("policy_name", "unknown")
-    filename = f"{policy_name}_run{run_index}.json"
-    out_path = output_dir / filename
-    out_path.write_text(
+
+    # JSON — full machine-readable output
+    json_path = output_dir / f"{policy_name}_run{run_index}.json"
+    json_path.write_text(
         json.dumps(result, indent=2, ensure_ascii=False, default=str),
         encoding="utf-8",
     )
-    print(f"\nResult saved to: {out_path}")
-    return out_path
+
+    # Markdown — human-readable report
+    report_path = output_dir / f"{policy_name}_run{run_index}_report.md"
+    generate_report(result, report_path)
+
+    print(f"\nJSON saved to:   {json_path}")
+    print(f"Report saved to: {report_path}")
+    return json_path
 
 
 def _empty_result(policy_name: str, extractor_output: dict, flagged_clauses: list) -> dict:
@@ -300,10 +282,16 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--model-scout",
+        default=None,
+        metavar="MODEL",
+        help="Model for Pass 1 Scout (section identifier inside Agent 1). Overrides --model.",
+    )
+    parser.add_argument(
         "--model-extractor",
         default=None,
         metavar="MODEL",
-        help="Model for Agent 1 (Extractor). Overrides --model.",
+        help="Model for Agent 1 Pass 2 (Deep Extractor). Overrides --model.",
     )
     parser.add_argument(
         "--model-evaluator",
@@ -354,6 +342,7 @@ def main() -> None:
         return cli_override or DEFAULT_AGENT_MODELS.get(agent) or args.model
 
     agent_models = {
+        "scout":       _resolve("scout",       args.model_scout),
         "extractor":   _resolve("extractor",   args.model_extractor),
         "evaluator":   _resolve("evaluator",   args.model_evaluator),
         "reflector_a": _resolve("reflector_a", args.model_reflector_a),
@@ -372,21 +361,6 @@ def main() -> None:
         save_result(result, output_dir, run_index=run_i)
         all_results.append(result)
 
-    # Compute M3 label stability if multiple runs
-    if args.runs > 1:
-        final_outputs = [r.get("finalizer_output", {}) for r in all_results]
-        m3 = m3_label_stability(final_outputs, label_field="overall_label")
-        print(f"\n{'='*60}")
-        print("M3 Label Stability (across all runs):")
-        print(f"  Labels:    {m3['labels_per_run']}")
-        print(f"  Flips:     {m3['flip_count']} / {m3['total_comparisons']}")
-        print(f"  Flip rate: {m3['flip_rate']:.2%}")
-        print(f"  Stable:    {m3['is_stable']}")
-
-        # Save M3 to a summary file
-        m3_path = output_dir / f"{policy_path.stem}_m3_stability.json"
-        m3_path.write_text(json.dumps(m3, indent=2), encoding="utf-8")
-        print(f"  Saved M3 report to: {m3_path}")
 
 
 if __name__ == "__main__":

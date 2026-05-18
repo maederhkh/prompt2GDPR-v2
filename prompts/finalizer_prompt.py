@@ -117,10 +117,20 @@ def build_finalizer_prompt(
             )
         flagged_details = "\n".join(lines)
 
+    # Send a compact extractor summary (not full clause text) to save context tokens.
+    # The full clause text is already embedded in the evaluator output.
+    extractor_summary = {
+        "policy_name": extractor_output.get("policy_name"),
+        "clause_count": len(extractor_output.get("extracted_clauses", [])),
+        "coverage_complete": extractor_output.get("coverage_complete"),
+        "extraction_notes": extractor_output.get("extraction_notes"),
+        "sections_processed": extractor_output.get("sections_processed"),
+    }
+
     return FINALIZER_USER_TEMPLATE.format(
         policy_name=policy_name,
         assessment_date=assessment_date,
-        extractor_output_json=json.dumps(extractor_output, indent=2, ensure_ascii=False),
+        extractor_output_json=json.dumps(extractor_summary, indent=2, ensure_ascii=False),
         verified_count=len(verified_clauses),
         flagged_count=len(flagged_clauses),
         flagged_details=flagged_details,
