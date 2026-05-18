@@ -156,3 +156,70 @@ def build_section_extractor_prompt(
         clause_id_start=clause_id_start,
         clause_id_start_plus_1=clause_id_start + 1,
     )
+
+
+# ---------------------------------------------------------------------------
+# Self-check gap judgment prompt (used in Pass 3)
+# ---------------------------------------------------------------------------
+
+SELF_CHECK_JUDGE_SYSTEM = """\
+You are a GDPR purpose limitation specialist. Your only job is to decide \
+whether a single paragraph from a privacy policy contains content relevant \
+to GDPR Article 5(1)(b) — purpose limitation — that was NOT already captured \
+by a provided list of extracted clauses. Answer yes or no. Be strict: only \
+flag genuine gaps, not paragraphs that are already covered."""
+
+SELF_CHECK_JUDGE_TEMPLATE = """\
+## Already extracted clauses from this section
+The following clauses have already been extracted from this section:
+
+{existing_clauses_json}
+
+## Uncovered paragraph
+The paragraph below was NOT matched to any of the above clauses:
+
+\"\"\"{paragraph}\"\"\"
+
+## Your task
+Does this paragraph contain purpose limitation content relevant to \
+GDPR Article 5(1)(b) that is NOT already captured in the extracted clauses above?
+
+Purpose limitation content includes:
+- Stated processing purposes
+- Legal basis tied to a specific purpose
+- Secondary or further use of already-collected data
+- Third-party data sharing with stated purposes
+- Research, analytics, profiling, or product development purposes
+- Article 89 GDPR exceptions
+
+Return ONLY valid JSON. No prose, no markdown.
+
+{{
+  "is_gap": true,
+  "reason": "One sentence explaining why this paragraph contains uncaptured purpose limitation content."
+}}
+
+or
+
+{{
+  "is_gap": false,
+  "reason": "One sentence explaining why this paragraph does not contain uncaptured purpose limitation content."
+}}
+"""
+
+
+def build_gap_judge_prompt(
+    paragraph: str,
+    existing_clauses: list[dict],
+) -> str:
+    """Return the formatted user prompt for the gap judgment call (Pass 3)."""
+    import json
+    clauses_for_prompt = [
+        {k: v for k, v in c.items()
+         if k in ("clause_id", "quote", "relevance_type")}
+        for c in existing_clauses
+    ]
+    return SELF_CHECK_JUDGE_TEMPLATE.format(
+        existing_clauses_json=json.dumps(clauses_for_prompt, indent=2, ensure_ascii=False),
+        paragraph=paragraph,
+    )
