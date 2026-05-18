@@ -19,6 +19,8 @@ from prompts.extractor_prompt import (
     EXTRACTOR_SYSTEM,
     build_extractor_prompt,
     build_section_extractor_prompt,
+    SELF_CHECK_JUDGE_SYSTEM,
+    build_gap_judge_prompt,
 )
 from prompts.scout_prompt import SCOUT_SYSTEM, build_scout_prompt
 from utils.schema_validator import parse_and_repair, validate_extractor_output
@@ -229,6 +231,8 @@ def _run_single_pass(
             "Extractor output failed validation:\n" + "\n".join(f"  - {e}" for e in errors)
         )
 
+    return data
+
 
 def _find_uncovered_paragraphs(
     sections: list[dict],
@@ -295,4 +299,46 @@ def _find_uncovered_paragraphs(
 
     return uncovered
 
-    return data
+
+def _judge_paragraph_gap(
+    client: OpenAI,
+    paragraph: str,
+    section_clauses: list[dict],
+    model: str,
+) -> dict:
+    """
+    Pass 3 Step 2: ask the model whether an uncovered paragraph contains
+    purpose limitation content not already captured.
+
+    Args:
+        client: OpenRouter-configured OpenAI client.
+        paragraph: The uncovered paragraph text.
+        section_clauses: Already-extracted clauses from the same section.
+        model: Model slug for gap judgment (Gemini Flash).
+
+    Returns:
+        {"is_gap": bool, "reason": str} — defaults to is_gap=False on failure.
+    """
+    try:
+        user_prompt = build_gap_judge_prompt(
+            paragraph=paragraph,
+            existing_clauses=section_clauses,
+        )
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=256,
+            messages=[
+                {"role": "system", "content": SELF_CHECK_JUDGE_SYSTEM},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        raw = response.choices[0].message.content or ""
+        data = parse_and_repair(raw)
+        if isinstance(data, dict) and "is_gap" in data:
+            return {
+                "is_gap": bool(data["is_gap"]),
+                "reason": str(data.get("reason", "")),
+            }
+    except Exception as e:
+        print(f"    [Self-Check] Warning: gap judgment failed ({e}). Treating as no gap.")
+    return {"is_gap": False, "reason": "judgment call failed — treated as no gap"}
