@@ -345,3 +345,69 @@ def _judge_paragraph_gap(
     except Exception as e:
         print(f"    [Self-Check] Warning: gap judgment failed ({e}). Treating as no gap.")
     return {"is_gap": False, "reason": "judgment call failed — treated as no gap"}
+
+
+def _reextract_gap(
+    client: OpenAI,
+    paragraph: str,
+    section_name: str,
+    existing_clauses: list[dict],
+    clause_id_start: int,
+    model: str,
+) -> list[dict]:
+    """
+    Pass 3 Step 3: re-extract purpose limitation clauses from a confirmed
+    gap paragraph using GPT-5.3.
+
+    Args:
+        client: OpenRouter-configured OpenAI client.
+        paragraph: The gap paragraph text to re-extract from.
+        section_name: Name of the section this paragraph belongs to.
+        existing_clauses: Already-extracted clauses from this section
+                          (to avoid duplicate extraction).
+        clause_id_start: Starting clause ID number for new clauses.
+        model: Model slug for re-extraction (GPT-5.3).
+
+    Returns:
+        List of newly extracted clause dicts, or [] on failure.
+    """
+    import json
+
+    # Build a targeted extraction prompt for just this paragraph,
+    # telling the model what has already been extracted to avoid duplicates
+    existing_summary = json.dumps(
+        [{"clause_id": c.get("clause_id"), "quote": c.get("quote")}
+         for c in existing_clauses],
+        indent=2, ensure_ascii=False
+    )
+
+    user_prompt = (
+        f"## Already extracted clauses from section '{section_name}'\n"
+        f"Do NOT re-extract any of the following — they are already captured:\n"
+        f"{existing_summary}\n\n"
+        f"---\n\n"
+        + build_section_extractor_prompt(
+            section_name=section_name,
+            section_text=paragraph,
+            clause_id_start=clause_id_start,
+        )
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=MAX_TOKENS["extractor"],
+            messages=[
+                {"role": "system", "content": EXTRACTOR_SYSTEM},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        raw = response.choices[0].message.content or ""
+        data = parse_and_repair(raw)
+        clauses = data.get("extracted_clauses", [])
+        if isinstance(clauses, list):
+            return clauses
+    except Exception as e:
+        print(f"    [Self-Check] Warning: re-extraction failed for section "
+              f"'{section_name}' ({e}).")
+    return []
