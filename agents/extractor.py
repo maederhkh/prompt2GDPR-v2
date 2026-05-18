@@ -411,3 +411,109 @@ def _reextract_gap(
         print(f"    [Self-Check] Warning: re-extraction failed for section "
               f"'{section_name}' ({e}).")
     return []
+
+
+def _self_check(
+    client: OpenAI,
+    sections: list[dict],
+    all_clauses: list[dict],
+    clause_counter: int,
+    model: str,
+    scout_model: str,
+) -> tuple[list[dict], dict]:
+    """
+    Pass 3: self-check orchestrator.
+
+    Finds uncovered paragraphs, judges each with Gemini Flash, re-extracts
+    confirmed gaps with GPT-5.3, and builds the self_check_report.
+
+    Args:
+        client: OpenRouter-configured OpenAI client.
+        sections: Section chunks from the splitter (name + text).
+        all_clauses: All clauses produced by Pass 2.
+        clause_counter: Next available clause ID number.
+        model: Model slug for re-extraction (GPT-5.3).
+        scout_model: Model slug for gap judgment (Gemini Flash).
+
+    Returns:
+        Tuple of (new_clauses, self_check_report).
+        new_clauses: list of newly found clause dicts (may be empty).
+        self_check_report: dict with full Pass 3 summary.
+    """
+    print("    [Self-Check] Pass 3: checking paragraph coverage...")
+
+    uncovered = _find_uncovered_paragraphs(sections, all_clauses)
+    print(f"    [Self-Check] {len(uncovered)} uncovered paragraph(s) found.")
+
+    new_clauses: list[dict] = []
+    gaps_found = 0
+    gaps_filled = 0
+    unresolved_gaps: list[dict] = []
+
+    for item in uncovered:
+        section_name = item["section_name"]
+        paragraph = item["paragraph"]
+        section_clauses = item["section_clauses"]
+
+        # Step 2: judge whether this is a real gap
+        judgment = _judge_paragraph_gap(
+            client=client,
+            paragraph=paragraph,
+            section_clauses=section_clauses,
+            model=scout_model,
+        )
+
+        if not judgment["is_gap"]:
+            continue
+
+        gaps_found += 1
+        print(f"    [Self-Check] Gap confirmed in '{section_name}': {judgment['reason'][:60]}")
+
+        # Step 3: re-extract from the gap paragraph
+        gap_clauses = _reextract_gap(
+            client=client,
+            paragraph=paragraph,
+            section_name=section_name,
+            existing_clauses=section_clauses + new_clauses,
+            clause_id_start=clause_counter,
+            model=model,
+        )
+
+        if gap_clauses:
+            new_clauses.extend(gap_clauses)
+            clause_counter += len(gap_clauses)
+            gaps_filled += 1
+            print(f"    [Self-Check] Gap filled: {len(gap_clauses)} new clause(s) added.")
+        else:
+            unresolved_gaps.append({
+                "section_name": section_name,
+                "paragraph": paragraph,
+                "reason": (
+                    "Re-extraction found no extractable purpose limitation "
+                    "content in this paragraph."
+                ),
+            })
+            print(f"    [Self-Check] Gap unresolved in '{section_name}'.")
+
+    # Build human_review_note
+    if unresolved_gaps:
+        sections_with_gaps = list({g["section_name"] for g in unresolved_gaps})
+        human_review_note = (
+            f"{len(unresolved_gaps)} paragraph gap(s) could not be resolved after "
+            f"re-extraction. Human reviewer should manually check: "
+            f"{', '.join(sections_with_gaps)}."
+        )
+    else:
+        human_review_note = None
+
+    self_check_report = {
+        "paragraphs_checked": len(uncovered),
+        "gaps_found": gaps_found,
+        "gaps_filled": gaps_filled,
+        "gaps_unresolved": len(unresolved_gaps),
+        "new_clauses_added": [c.get("clause_id") for c in new_clauses],
+        "unresolved_gaps": unresolved_gaps,
+        "human_review_note": human_review_note,
+    }
+
+    return new_clauses, self_check_report
