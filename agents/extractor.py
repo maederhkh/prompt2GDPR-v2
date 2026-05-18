@@ -229,4 +229,70 @@ def _run_single_pass(
             "Extractor output failed validation:\n" + "\n".join(f"  - {e}" for e in errors)
         )
 
+
+def _find_uncovered_paragraphs(
+    sections: list[dict],
+    all_clauses: list[dict],
+) -> list[dict]:
+    """
+    For each section, split its text into paragraphs and check whether
+    each paragraph is covered by at least one extracted clause quote.
+
+    A paragraph is considered covered if its best fuzzy match score
+    against any clause quote from the same section is >= 60.
+
+    Args:
+        sections: List of {"name": str, "text": str} dicts from the splitter.
+        all_clauses: All clauses extracted in Pass 2.
+
+    Returns:
+        List of {"section_name": str, "paragraph": str,
+                 "section_clauses": list[dict]} dicts — one per uncovered paragraph.
+    """
+    from rapidfuzz import fuzz
+
+    uncovered = []
+
+    for section in sections:
+        section_name = section["name"]
+        section_text = section["text"]
+
+        # Clauses extracted from this specific section
+        section_clauses = [
+            c for c in all_clauses
+            if c.get("section_reference") == section_name
+        ]
+
+        # Split section into paragraphs
+        paragraphs = [
+            p.strip()
+            for p in section_text.split("\n\n")
+            if p.strip() and len(p.strip()) > 30  # skip very short fragments
+        ]
+
+        for paragraph in paragraphs:
+            if not section_clauses:
+                # No clauses at all from this section — every paragraph is uncovered
+                uncovered.append({
+                    "section_name": section_name,
+                    "paragraph": paragraph,
+                    "section_clauses": [],
+                })
+                continue
+
+            # Check best match against all clause quotes from this section
+            best_score = max(
+                fuzz.partial_ratio(paragraph.lower(), c.get("quote", "").lower())
+                for c in section_clauses
+            )
+
+            if best_score < 60:
+                uncovered.append({
+                    "section_name": section_name,
+                    "paragraph": paragraph,
+                    "section_clauses": section_clauses,
+                })
+
+    return uncovered
+
     return data
