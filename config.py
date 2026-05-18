@@ -48,4 +48,5 @@ MAX_TOKENS = {
     "evaluator": 16000,   # Raised: two-pass extraction can yield 50–100 clauses; each needs full rubric
     "reflector": 8000,    # Raised: more clauses means a longer reflector review
     "finalizer": 8000,    # Raised: final report over many clauses can be long
+    "gap_judge": 256,     # Gap judgment: small yes/no response
 }

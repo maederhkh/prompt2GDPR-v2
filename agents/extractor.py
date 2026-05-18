@@ -326,7 +326,7 @@ def _judge_paragraph_gap(
         )
         response = client.chat.completions.create(
             model=model,
-            max_tokens=256,
+            max_tokens=MAX_TOKENS["gap_judge"],
             messages=[
                 {"role": "system", "content": SELF_CHECK_JUDGE_SYSTEM},
                 {"role": "user", "content": user_prompt},
@@ -339,6 +339,9 @@ def _judge_paragraph_gap(
                 "is_gap": bool(data["is_gap"]),
                 "reason": str(data.get("reason", "")),
             }
+        else:
+            print(f"    [Self-Check] Warning: unexpected response schema (missing 'is_gap'). Treating as no gap.")
+            return {"is_gap": False, "reason": "unexpected response schema — treated as no gap"}
     except Exception as e:
         print(f"    [Self-Check] Warning: gap judgment failed ({e}). Treating as no gap.")
     return {"is_gap": False, "reason": "judgment call failed — treated as no gap"}
