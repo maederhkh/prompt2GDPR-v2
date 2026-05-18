@@ -20,3 +20,4 @@ output/results/
 .vscode/
 .idea/
 *.swp
+.env
