@@ -1,5 +1,5 @@
 """
-Agent 1: Extractor (two-pass architecture)
+Agent 1: Extractor (three-pass architecture)
 
 Pass 1 — Section Scout:
     A lightweight call that reads the full policy and returns a list of
@@ -10,6 +10,13 @@ Pass 2 — Deep Extractor:
     complete paragraphs (not individual sentences). This prevents the
     single-pass problem of stopping at the purpose sentence and missing
     safeguards or legal basis text in the same paragraph.
+
+Pass 3 — Self-Check:
+    After Pass 2, each section's paragraphs are compared against the
+    extracted clause quotes using fuzzy matching. Uncovered paragraphs
+    are judged by a lightweight model to confirm whether they contain
+    purpose limitation content not yet captured. Confirmed gaps are
+    re-extracted by the deep extractor and appended to the clause list.
 """
 
 from openai import OpenAI
@@ -39,7 +46,8 @@ def run_extractor(
     Run two-pass extraction on a privacy policy.
 
     Pass 1 identifies relevant sections; Pass 2 extracts complete
-    paragraphs from each section. Falls back to single-pass if the
+    paragraphs from each section; Pass 3 self-checks for uncovered
+    paragraphs and fills gaps. Falls back to single-pass if the
     Scout returns no usable sections.
 
     Args:
@@ -99,9 +107,23 @@ def run_extractor(
         all_clauses.extend(section_clauses)
         clause_counter += len(section_clauses)
 
+    # ------------------------------------------------------------------
+    # Pass 3: Self-check — find and fill paragraph coverage gaps
+    # ------------------------------------------------------------------
+    new_clauses, self_check_report = _self_check(
+        client=client,
+        sections=sections,
+        all_clauses=all_clauses,
+        clause_counter=clause_counter,
+        model=_model,
+        scout_model=_scout_model,
+    )
+    all_clauses.extend(new_clauses)
+
     notes = (
-        f"Two-pass extraction: {len(sections)} section(s) processed "
-        f"({', '.join(s['name'] for s in sections)})."
+        f"Two-pass extraction with self-check: {len(sections)} section(s) processed "
+        f"({', '.join(s['name'] for s in sections)}). "
+        f"Self-check added {len(new_clauses)} clause(s)."
     )
 
     result = {
@@ -110,6 +132,7 @@ def run_extractor(
         "extraction_notes": notes,
         "coverage_complete": True,
         "sections_processed": [s["name"] for s in sections],
+        "self_check_report": self_check_report,
     }
 
     errors = validate_extractor_output(result)
