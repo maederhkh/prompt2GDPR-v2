@@ -22,3 +22,5 @@ output/results/
 *.swp
 .env
 .claude/settings.local.json
+.claude/settings.local.json
+docs/
