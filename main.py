@@ -210,6 +210,7 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
 
     return {
         "policy_name": policy_name,
+        "agent_models": agent_models,
         "extractor_output": extractor_output,
         "verified_clauses": verified_clauses,
         "flagged_clauses": flagged_clauses,
@@ -226,7 +227,8 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
 
 
 def save_result(result: dict, output_dir: Path, run_index: int = 1) -> Path:
-    """Save a run result to a JSON file and a markdown report, return the JSON path."""
+    """Save a run result to a JSON file, a markdown report, and the cumulative
+    model usage log. Returns the JSON path."""
     output_dir.mkdir(parents=True, exist_ok=True)
     policy_name = result.get("policy_name", "unknown")
 
@@ -241,9 +243,53 @@ def save_result(result: dict, output_dir: Path, run_index: int = 1) -> Path:
     report_path = output_dir / f"{policy_name}_run{run_index}_report.md"
     generate_report(result, report_path)
 
+    # Cumulative model usage log — append one row per run for easy comparison
+    _append_model_usage_log(result, output_dir, run_index)
+
     print(f"\nJSON saved to:   {json_path}")
     print(f"Report saved to: {report_path}")
     return json_path
+
+
+def _append_model_usage_log(result: dict, output_dir: Path, run_index: int) -> None:
+    """Append one entry to output/model_usage_log.md for cross-run comparison."""
+    import datetime
+
+    log_path = output_dir / "model_usage_log.md"
+    agent_models = result.get("agent_models", {})
+    policy_name = result.get("policy_name", "unknown")
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    overall_label = result.get("finalizer_output", {}).get("overall_label", "N/A")
+    retry_count = result.get("retry_count", 0)
+    clause_count = len(result.get("verified_clauses", []))
+
+    # Write header if file does not exist yet
+    if not log_path.exists():
+        header = (
+            "# Model Usage Log\n\n"
+            "One row per pipeline run. Use this to compare model choices across runs.\n\n"
+            "| Run | Date | Policy | Scout | Extractor | Evaluator | "
+            "Reflector A | Reflector B | Finalizer | "
+            "Clauses | Label | Retries |\n"
+            "|---|---|---|---|---|---|---|---|---|---|---|---|\n"
+        )
+        log_path.write_text(header, encoding="utf-8")
+
+    row = (
+        f"| {run_index} | {timestamp} | {policy_name} "
+        f"| {agent_models.get('scout', 'N/A')} "
+        f"| {agent_models.get('extractor', 'N/A')} "
+        f"| {agent_models.get('evaluator', 'N/A')} "
+        f"| {agent_models.get('reflector_a', 'N/A')} "
+        f"| {agent_models.get('reflector_b', 'N/A')} "
+        f"| {agent_models.get('finalizer', 'N/A')} "
+        f"| {clause_count} | {overall_label} | {retry_count} |\n"
+    )
+
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(row)
+
+    print(f"Model log updated: {log_path}")
 
 
 def _empty_result(policy_name: str, extractor_output: dict, flagged_clauses: list) -> dict:

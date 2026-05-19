@@ -16,8 +16,8 @@ def generate_report(result: dict, out_path: Path) -> None:
     finalizer = result.get("finalizer_output", {})
     evaluator = result.get("evaluator_output", {})
     extractor = result.get("extractor_output", {})
-    metrics = result.get("metrics", {})
     merged_reflector = result.get("final_reflector_output", {})
+    agent_models = result.get("agent_models", {})
     verified = result.get("verified_clauses", [])
     flagged = result.get("flagged_clauses", [])
 
@@ -255,41 +255,27 @@ def generate_report(result: dict, out_path: Path) -> None:
         lines.append(f"")
 
     # -----------------------------------------------------------------------
-    # Metrics
+    # Models used
     # -----------------------------------------------------------------------
-    lines.append(f"---")
-    lines.append(f"")
-    lines.append(f"## Evaluation Metrics")
-    lines.append(f"")
-
-    m1 = metrics.get("M1_rubric_alignment", {})
-    m2 = metrics.get("M2_evidence_grounding", {})
-    m4 = metrics.get("M4_structural_completeness", {})
-    m5 = metrics.get("M5_reflector_correction_rate", {})
-
-    lines.append(f"| Metric | Score | Details |")
-    lines.append(f"|---|---|---|")
-    lines.append(
-        f"| M1 Rubric Alignment | {m1.get('overall_score', 0):.0%} | "
-        f"{m1.get('total_criteria_assessed', 0)}/{m1.get('total_criteria_possible', 0)} criteria assessed |"
-    )
-    lines.append(
-        f"| M2 Evidence Grounding | verifier {m2.get('verifier_pass_rate', 0):.0%} | "
-        f"evaluator grounding {m2.get('evaluator_grounding_rate', 0):.0%} |"
-    )
-    lines.append(
-        f"| M4 Structural Completeness | {m4.get('overall_score', 0):.0%} | "
-        f"extractor {m4.get('extractor_score', 0):.0%} / "
-        f"evaluator {m4.get('evaluator_score', 0):.0%} / "
-        f"reflector {m4.get('reflector_score', 0):.0%} / "
-        f"finalizer {m4.get('finalizer_score', 0):.0%} |"
-    )
-    lines.append(
-        f"| M5 Reflector Correction | {m5.get('correction_rate', 0):.0%} | "
-        f"resolved {m5.get('resolved_count', 0)}/{m5.get('initial_error_count', 0)} errors / "
-        f"agreement {m5.get('agreement_rate', 1.0):.0%} |"
-    )
-    lines.append(f"")
+    if agent_models:
+        lines.append(f"---")
+        lines.append(f"")
+        lines.append(f"## Models Used")
+        lines.append(f"")
+        lines.append(f"| Agent | Role | Model |")
+        lines.append(f"|---|---|---|")
+        role_labels = {
+            "scout":       "Pass 1 — Section Scout + Pass 3 Gap Judge",
+            "extractor":   "Pass 2 — Deep Extractor + Pass 3 Re-extraction",
+            "evaluator":   "Agent 2 — GDPR Rubric Evaluator",
+            "reflector_a": "Agent 3A — Independent Auditor",
+            "reflector_b": "Agent 3B — Independent Auditor",
+            "finalizer":   "Agent 4 — Finalizer",
+        }
+        for agent, model in agent_models.items():
+            role = role_labels.get(agent, agent)
+            lines.append(f"| {agent} | {role} | `{model}` |")
+        lines.append(f"")
 
     # -----------------------------------------------------------------------
     # Write file

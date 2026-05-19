@@ -33,12 +33,12 @@ DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 #
 # Override any of these at runtime via CLI flags (see main.py --help).
 DEFAULT_AGENT_MODELS = {
-    "scout":       "google/gemini-3-flash-preview",  # Gemini Flash — cheap + fast section ID
-    "extractor":   "openai/gpt-5.3-chat",            # GPT-5.3 — strong instruction following
-    "evaluator":   "x-ai/grok-4.1-fast",             # Grok 4.1 — independent reasoning style
-    "reflector_a": "anthropic/claude-sonnet-4.5",    # Claude Sonnet 4.5 — first auditor
-    "reflector_b": "openai/gpt-5.3-chat",            # GPT-5.3 — second auditor (different from Grok)
-    "finalizer":   "anthropic/claude-sonnet-4.5",    # Claude Sonnet 4.5 — structured output
+    "scout":       "deepseek/deepseek-v4-flash:free",    # DeepSeek Flash (free) — lightweight section ID
+    "extractor":   "deepseek/deepseek-v4-flash:free",    # DeepSeek Flash (free) — verbatim quoting, no legal reasoning
+    "evaluator":   "qwen/qwen3-235b-a22b",               # Qwen3 235B — strong legal reasoning
+    "reflector_a": "openai/gpt-4o-mini",                 # GPT-4o Mini — first independent auditor
+    "reflector_b": "google/gemini-2.0-flash-001",        # Gemini 2.0 Flash — second auditor (different provider)
+    "finalizer":   "google/gemini-2.0-flash-001",        # Gemini 2.0 Flash — reliable structured output
 }
 
 # Per-agent token budgets (max_tokens sent to the API)
