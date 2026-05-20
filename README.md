@@ -156,7 +156,7 @@ python main.py --policy data/policies/policy_long.txt
 
 **Specify a model:**
 ```bash
-python main.py --policy data/policies/policy_long.txt --model openai/gpt-4o
+python main.py --policy data/policies/policy_long.txt 
 ```
 
 **Use different models per agent:**
@@ -177,7 +177,7 @@ python main.py --policy data/policies/policy_long.txt --runs 3
 ```
 --policy            Path to policy text file (required)
 --runs              Number of runs for M3 stability (default: 1)
---model             Global model for all agents (default: anthropic/claude-sonnet-4-5)
+--model             Global model for all agents 
 --model-extractor   Model override for Agent 1
 --model-evaluator   Model override for Agent 2
 --model-reflector-a Model override for Agent 3A
