@@ -37,7 +37,7 @@ DEFAULT_AGENT_MODELS = {
     "extractor":   "meta-llama/llama-3.3-70b-instruct",          # $0.10/$0.32 — high volume, no rate limits
     "evaluator":   "google/gemini-2.0-flash-001",                  # $0.10/$0.40 — reliable JSON output
     "reflector_a": "openai/gpt-4o-mini",                         # $0.15/$0.60 — first independent auditor
-    "reflector_b": "google/gemini-2.0-flash-001",                # $0.10/$0.40 — second auditor (different provider)
+    "reflector_b": "openai/gpt-4o-mini",                          # $0.15/$0.60 — second auditor (different provider from evaluator)
     "finalizer":   "google/gemini-2.0-flash-001",                # $0.10/$0.40 — reliable structured output
 }
 

@@ -319,7 +319,7 @@ def _find_uncovered_paragraphs(
                 for c in section_clauses
             )
 
-            if best_score < 60:
+            if best_score < 75:  # raised from 60 — reduces false positives on large sections
                 uncovered.append({
                     "section_name": section_name,
                     "paragraph": paragraph,
