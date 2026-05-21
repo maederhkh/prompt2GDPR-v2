@@ -35,7 +35,7 @@ DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 DEFAULT_AGENT_MODELS = {
     "scout":       "mistralai/mistral-small-24b-instruct-2501",  # $0.05/$0.08 — simple heading ID
     "extractor":   "meta-llama/llama-3.3-70b-instruct",          # $0.10/$0.32 — high volume, no rate limits
-    "evaluator":   "qwen/qwen3-235b-a22b",                       # $0.46/$1.82 — strong legal reasoning
+    "evaluator":   "google/gemini-2.0-flash-001",                  # $0.10/$0.40 — reliable JSON output
     "reflector_a": "openai/gpt-4o-mini",                         # $0.15/$0.60 — first independent auditor
     "reflector_b": "google/gemini-2.0-flash-001",                # $0.10/$0.40 — second auditor (different provider)
     "finalizer":   "google/gemini-2.0-flash-001",                # $0.10/$0.40 — reliable structured output
