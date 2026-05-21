@@ -120,6 +120,12 @@ def run_extractor(
     )
     all_clauses.extend(new_clauses)
 
+    # Sanitise all clauses: fill in any missing required fields that cheaper
+    # models occasionally omit (e.g. relevance_type from re-extraction).
+    for clause in all_clauses:
+        clause.setdefault("relevance_type", "purpose_statement")
+        clause.setdefault("section_reference", "unknown")
+
     notes = (
         f"Two-pass extraction with self-check: {len(sections)} section(s) processed "
         f"({', '.join(s['name'] for s in sections)}). "
