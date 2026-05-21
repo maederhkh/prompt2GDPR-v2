@@ -26,6 +26,10 @@ def parse_and_repair(raw: str) -> dict | list:
         ValueError: If the response cannot be parsed into valid JSON after all
                     repair attempts.
     """
+    # Step 0: strip thinking tags (Qwen3, DeepSeek-R1, and similar models
+    # prepend <think>...</think> blocks before their actual JSON output)
+    raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+
     # Step 1: direct parse
     try:
         return json.loads(raw)
