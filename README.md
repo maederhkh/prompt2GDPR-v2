@@ -10,9 +10,9 @@ The system replaces single-prompt LLM evaluation with a structured 4-agent pipel
 
 The original thesis assessed privacy policies against all 7 GDPR Article 5 principles using single-prompt GPT and Grok models. Three critical limitations were identified:
 
-1. **Misplaced evidence** — models cited real but irrelevant policy sections
-2. **Prompt-sensitive labels** — compliance labels changed when prompt wording changed
-3. **No autonomous reliability** — human expert review remained essential with no structured quality control
+1. **Misplaced evidence**: models cited real but irrelevant policy sections
+2. **Prompt-sensitive labels**: compliance labels changed when prompt wording changed
+3. **No autonomous reliability**: human expert review remained essential with no structured quality control
 
 This project addresses all three by scoping to Article 5(1)(b) and introducing a multi-agent architecture with self-correction, dual independent auditing, and on-demand legal reference retrieval.
 
@@ -25,7 +25,7 @@ Policy Text (.txt)
       │
       ▼
 [Agent 1: Extractor]
-      │  Extracts up to 15 verbatim clauses relevant to purpose limitation
+      │  Extracts all verbatim clauses relevant to purpose limitation (3 steps)
       ▼
 [String-Match Verifier]
       │  Checks clause quotes against policy text (rapidfuzz ≥ 85% threshold)
@@ -46,9 +46,6 @@ Policy Text (.txt)
       │  Consolidates all outputs into final compliance report
       │  Sets confidence: high / medium / low
       │  Always flags for human expert review
-      ▼
-[Evaluation Metrics M1–M5]
-      │
       ▼
 JSON output → output/results/
 ```
@@ -84,18 +81,6 @@ All references consulted are logged in the evaluator output under `references_us
 
 ---
 
-## Evaluation Metrics
-
-| Metric | What it measures |
-|---|---|
-| **M1 Rubric Alignment** | % of rubric criteria with valid answers per clause |
-| **M2 Evidence Grounding** | Verifier pass rate + evaluator phantom clause detection |
-| **M3 Label Stability** | Compliance label flip rate across multiple runs |
-| **M4 Structural Completeness** | Required schema field coverage per agent |
-| **M5 Reflector Correction Rate** | Errors resolved after retry + inter-reflector agreement rate |
-
----
-
 ## Project Structure
 
 ```
@@ -117,8 +102,6 @@ prompt2gdpr_v2/
 │   ├── schema_validator.py        # JSON parse + repair + validate
 │   ├── reflector_merge.py         # Dual reflector merge logic
 │   └── legal_tools.py             # Legal reference tool definitions + executor
-├── evaluation/
-│   └── metrics.py                 # M1–M5
 ├── data/
 │   ├── policies/                  # Input policy text files (.txt)
 │   └── legal_refs/
@@ -130,84 +113,6 @@ prompt2gdpr_v2/
 
 ---
 
-## Setup
-
-**1. Clone the repo:**
-```bash
-git clone https://github.com/maederhkh/prompt2GDPR-v2.git
-cd prompt2GDPR-v2
-```
-
-**2. Install dependencies:**
-```bash
-pip install openai pydantic rapidfuzz python-dotenv json-repair
-```
-
-**3. Add your OpenRouter API key:**
-
-Create a `.env` file in the project root:
-```
-OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-Get a free API key at [openrouter.ai](https://openrouter.ai).
-
-**4. Add policy files:**
-
-Place plain text (`.txt`) privacy policy files in `data/policies/`.
-
-**5. Add legal reference texts:**
-
-Fill in the files under `data/legal_refs/primary/` and `data/legal_refs/secondary/` with the official GDPR text and WP29 excerpts. Sources:
-- Articles and recitals: [gdpr-info.eu](https://gdpr-info.eu)
-- WP29 Opinion 03/2013: [EC archive](https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2013/wp203_en.pdf)
-
----
-
-## Usage
-
-**Basic run (default model — Claude Sonnet 4.5):**
-```bash
-python main.py --policy data/policies/policy_long.txt
-```
-
-**Specify a model:**
-```bash
-python main.py --policy data/policies/policy_long.txt --model openai/gpt-4o
-```
-
-**Use different models per agent:**
-```bash
-python main.py --policy data/policies/policy_long.txt \
-  --model-extractor openai/gpt-4o-mini \
-  --model-evaluator anthropic/claude-sonnet-4-5 \
-  --model-reflector-a anthropic/claude-sonnet-4-5 \
-  --model-reflector-b openai/gpt-4o \
-  --model-finalizer openai/gpt-4o-mini
-```
-
-**Run multiple times to measure label stability (M3):**
-```bash
-python main.py --policy data/policies/policy_long.txt --runs 3
-```
-
-**All CLI options:**
-```
---policy            Path to policy text file (required)
---runs              Number of runs for M3 stability (default: 1)
---model             Global model for all agents (default: anthropic/claude-sonnet-4-5)
---model-extractor   Model override for Agent 1
---model-evaluator   Model override for Agent 2
---model-reflector-a Model override for Agent 3A
---model-reflector-b Model override for Agent 3B
---model-finalizer   Model override for Agent 4
---output-dir        Output directory (default: output/results/)
-```
-
-Model slugs follow OpenRouter format: `provider/model-name`
-Full list at [openrouter.ai/models](https://openrouter.ai/models).
-
----
 
 ## Output
 
