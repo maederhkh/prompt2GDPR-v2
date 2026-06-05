@@ -35,10 +35,10 @@ DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 DEFAULT_AGENT_MODELS = {
     "scout":       "mistralai/mistral-small-24b-instruct-2501",  # $0.05/$0.08 — simple heading ID
     "extractor":   "meta-llama/llama-3.3-70b-instruct",          # $0.10/$0.32 — high volume, no rate limits
-    "evaluator":   "google/gemini-2.0-flash-001",                  # $0.10/$0.40 — reliable JSON output
+    "evaluator":   "openai/gpt-4o-mini",                         # $0.15/$0.60 — reliable JSON output (gemini-2.0-flash-001 deprecated on OpenRouter)
     "reflector_a": "openai/gpt-4o-mini",                         # $0.15/$0.60 — first independent auditor
     "reflector_b": "openai/gpt-4o-mini",                          # $0.15/$0.60 — second auditor (different provider from evaluator)
-    "finalizer":   "google/gemini-2.0-flash-001",                # $0.10/$0.40 — reliable structured output
+    "finalizer":   "openai/gpt-4o-mini",                         # $0.15/$0.60 — reliable structured output (gemini-2.0-flash-001 deprecated on OpenRouter)
     "blind_a":     "openai/gpt-4o-mini",                         # mirrors reflector_a — blind label for anchoring delta
     "blind_b":     "openai/gpt-4o-mini",                         # mirrors reflector_b — blind label for anchoring delta
 }
