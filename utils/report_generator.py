@@ -310,7 +310,7 @@ def generate_report(result: dict, out_path: Path) -> None:
             for row in label_panel["per_clause"]:
                 status = "⚠️ Disputed" if row.get("disputed") else "✅ Agreed"
                 lines.append(
-                    f"| {row['clause_id']} | {_lab(row.get('evaluator'))} | "
+                    f"| {row.get('clause_id', '?')} | {_lab(row.get('evaluator'))} | "
                     f"{_lab(row.get('reflector_a'))} | {_lab(row.get('reflector_b'))} | "
                     f"{_lab(row.get('blind_a'))} | {_lab(row.get('blind_b'))} | {status} |"
                 )
@@ -320,7 +320,7 @@ def generate_report(result: dict, out_path: Path) -> None:
             for row in label_panel["per_clause"]:
                 status = "⚠️ Disputed" if row.get("disputed") else "✅ Agreed"
                 lines.append(
-                    f"| {row['clause_id']} | {_lab(row.get('evaluator'))} | "
+                    f"| {row.get('clause_id', '?')} | {_lab(row.get('evaluator'))} | "
                     f"{_lab(row.get('reflector_a'))} | {_lab(row.get('reflector_b'))} | {status} |"
                 )
         lines.append(f"")
