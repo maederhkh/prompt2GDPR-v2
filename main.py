@@ -30,14 +30,17 @@ from agents.evaluator import run_evaluator
 from agents.reflector import run_reflector, errors_for_agent, build_retry_instructions
 from utils.reflector_merge import merge_reflector_outputs
 from agents.finalizer import run_finalizer
-from config import DEFAULT_MODEL, DEFAULT_AGENT_MODELS, OPENROUTER_BASE_URL
+from agents.blind_labeler import run_blind_labeler
+from utils.label_panel import build_label_panel, annotate_finalizer_with_disputes
+from config import DEFAULT_MODEL, DEFAULT_AGENT_MODELS, OPENROUTER_BASE_URL, ENABLE_BLIND_LABELER
 from utils.verifier import verify_clauses
 from utils.report_generator import generate_report
 
 MAX_RETRIES = 2
 
 
-def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
+def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
+                 blind_enabled: bool = True) -> dict:
     """
     Execute the full 4-agent pipeline for a single policy file.
 
@@ -46,6 +49,7 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
         policy_path: Path to the policy text file.
         agent_models: Dict with keys "extractor", "evaluator", "reflector",
                       "finalizer" mapping to the model slug for each agent.
+        blind_enabled: If True, run Blind Labeler A and B for anchoring measurement.
 
     Returns:
         A dict containing all intermediate outputs, the final report,
@@ -124,6 +128,45 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
           f"(both={initial_reflector_output['both_flagged_count']}, "
           f"A-only={initial_reflector_output['a_only_count']}, "
           f"B-only={initial_reflector_output['b_only_count']})")
+
+    # ------------------------------------------------------------------
+    # Blind Labelers + Label Panel
+    # ------------------------------------------------------------------
+    blind_a_output = None
+    blind_b_output = None
+    if blind_enabled:
+        print("\n[Blind Labeler A] Independent (unanchored) labeling...")
+        blind_a_output = run_blind_labeler(
+            client, verified_clauses, model=agent_models["blind_a"]
+        )
+        print(f"  Blind A labeled {len(blind_a_output.get('labels', []))} clause(s).")
+
+        print("\n[Blind Labeler B] Independent (unanchored) labeling...")
+        blind_b_output = run_blind_labeler(
+            client, verified_clauses, model=agent_models["blind_b"]
+        )
+        print(f"  Blind B labeled {len(blind_b_output.get('labels', []))} clause(s).")
+    else:
+        print("\n[Blind Labeler] Disabled for this run.")
+
+    label_panel = build_label_panel(
+        evaluator_output=evaluator_output,
+        reflector_a=reflector_a_initial,
+        reflector_b=reflector_b_initial,
+        blind_a=blind_a_output,
+        blind_b=blind_b_output,
+        models=agent_models,
+        blind_enabled=blind_enabled,
+    )
+    print("\n[Label Panel] Assembling per-clause labels...")
+    print(f"  {label_panel['disputed_count']} disputed clause(s).")
+    if blind_enabled and label_panel.get("anchoring_summary"):
+        for ref_key in ("reflector_a", "reflector_b"):
+            summary = label_panel["anchoring_summary"][ref_key]
+            rate = summary["shift_rate"]
+            rate_str = f"{rate:.0%}" if rate is not None else "n/a"
+            print(f"  [Anchoring] {ref_key} ({summary['model']}): "
+                  f"{summary['clauses_changed']}/{summary['total']} changed ({rate_str}).")
 
     final_reflector_output = initial_reflector_output
     retry_count = 0
@@ -208,6 +251,8 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
     print(f"  Final label: {finalizer_output.get('overall_label')} "
           f"(confidence: {finalizer_output.get('confidence')})")
 
+    annotate_finalizer_with_disputes(finalizer_output, label_panel)
+
     return {
         "policy_name": policy_name,
         "agent_models": agent_models,
@@ -221,6 +266,9 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict) -> dict:
         "final_reflector_output": final_reflector_output,       # merged after retries
         "retry_count": retry_count,
         "finalizer_output": finalizer_output,
+        "label_panel": label_panel,
+        "blind_a_output": blind_a_output,
+        "blind_b_output": blind_b_output,
     }
 
 
@@ -364,6 +412,12 @@ def main() -> None:
         help="Model for Agent 4 (Finalizer). Overrides --model.",
     )
     parser.add_argument(
+        "--no-blind-labeler",
+        action="store_true",
+        help="Disable the Blind Labeler tier for this run (skips 2 LLM calls; "
+             "label panel still records evaluator + reflector labels).",
+    )
+    parser.add_argument(
         "--output-dir",
         default="output/results",
         help="Directory to save result JSON files. Default: output/results/",
@@ -394,6 +448,8 @@ def main() -> None:
         "reflector_a": _resolve("reflector_a", args.model_reflector_a),
         "reflector_b": _resolve("reflector_b", args.model_reflector_b),
         "finalizer":   _resolve("finalizer",   args.model_finalizer),
+        "blind_a":     _resolve("blind_a",     None),
+        "blind_b":     _resolve("blind_b",     None),
     }
 
     all_results = []
@@ -403,7 +459,10 @@ def main() -> None:
             print(f"# Run {run_i} of {args.runs}")
             print(f"{'#'*60}")
 
-        result = run_pipeline(client, policy_path, agent_models=agent_models)
+        blind_enabled = ENABLE_BLIND_LABELER and not args.no_blind_labeler
+        result = run_pipeline(
+            client, policy_path, agent_models=agent_models, blind_enabled=blind_enabled
+        )
         save_result(result, output_dir, run_index=run_i)
         all_results.append(result)
 

@@ -88,6 +88,15 @@ Use exactly one of these values for error_type:
 
 ---
 
+## Your own verdict label (required)
+In addition to flagging errors, independently state the compliance label YOU would
+assign to each verified clause, based on the clause text and your own judgment.
+Populate "clause_labels" with exactly one entry per verified clause, using only
+"Compliant", "Partially Compliant", or "Non-Compliant". This is your verdict — it may
+agree or disagree with the Evaluator's label.
+
+---
+
 ## Output format
 Return ONLY valid JSON matching this exact schema. No prose, no markdown, no explanation.
 
@@ -100,6 +109,9 @@ Return ONLY valid JSON matching this exact schema. No prose, no markdown, no exp
       "clause_id": "<clause_id or null if not clause-specific>",
       "description": "One precise sentence describing the problem."
     }}
+  ],
+  "clause_labels": [
+    {{ "clause_id": "C1", "label": "Compliant|Partially Compliant|Non-Compliant" }}
   ],
   "reflector_notes": "Overall observation about output quality in 1-2 sentences, or null."
 }}

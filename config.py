@@ -35,10 +35,12 @@ DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 DEFAULT_AGENT_MODELS = {
     "scout":       "mistralai/mistral-small-24b-instruct-2501",  # $0.05/$0.08 — simple heading ID
     "extractor":   "meta-llama/llama-3.3-70b-instruct",          # $0.10/$0.32 — high volume, no rate limits
-    "evaluator":   "google/gemini-2.0-flash-001",                  # $0.10/$0.40 — reliable JSON output
+    "evaluator":   "openai/gpt-4o-mini",                         # $0.15/$0.60 — reliable JSON output (gemini-2.0-flash-001 deprecated on OpenRouter)
     "reflector_a": "openai/gpt-4o-mini",                         # $0.15/$0.60 — first independent auditor
     "reflector_b": "openai/gpt-4o-mini",                          # $0.15/$0.60 — second auditor (different provider from evaluator)
-    "finalizer":   "google/gemini-2.0-flash-001",                # $0.10/$0.40 — reliable structured output
+    "finalizer":   "openai/gpt-4o-mini",                         # $0.15/$0.60 — reliable structured output (gemini-2.0-flash-001 deprecated on OpenRouter)
+    "blind_a":     "openai/gpt-4o-mini",                         # mirrors reflector_a — blind label for anchoring delta
+    "blind_b":     "openai/gpt-4o-mini",                         # mirrors reflector_b — blind label for anchoring delta
 }
 
 # Per-agent token budgets (max_tokens sent to the API)
@@ -48,5 +50,15 @@ MAX_TOKENS = {
     "evaluator": 16000,   # Raised: two-pass extraction can yield 50–100 clauses; each needs full rubric
     "reflector": 8000,    # Raised: more clauses means a longer reflector review
     "finalizer": 8000,    # Raised: final report over many clauses can be long
-    "gap_judge": 256,     # Gap judgment: small yes/no response
+    "gap_judge":    256,     # Gap judgment: small yes/no response
+    "blind_labeler": 16000,  # same budget style as evaluator — labels for a full batch
 }
+
+# Feature toggle: Blind Labeler tier (Pass for anchoring measurement).
+# When False, the two blind-labeler calls are skipped and the label panel
+# still records evaluator + reflector labels (no blind labels, no anchoring delta).
+ENABLE_BLIND_LABELER = True
+
+# Temperature for all label-producing calls (evaluator, reflectors, blind labelers).
+# Fixed at 0 so a blind-vs-anchored label difference reflects the model, not sampling noise.
+LABELER_TEMPERATURE = 0

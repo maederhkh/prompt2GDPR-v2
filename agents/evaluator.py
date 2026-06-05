@@ -15,7 +15,7 @@ import json
 
 from openai import OpenAI
 
-from config import MAX_TOKENS
+from config import MAX_TOKENS, LABELER_TEMPERATURE
 from prompts.evaluator_prompt import EVALUATOR_SYSTEM, build_evaluator_prompt
 from utils.schema_validator import parse_and_repair, validate_evaluator_output
 from utils.legal_tools import LEGAL_TOOLS, execute_tool_call, ref_source_type
@@ -91,6 +91,7 @@ def run_evaluator(
         response = client.chat.completions.create(
             model=model,
             max_tokens=MAX_TOKENS["evaluator"],
+            temperature=LABELER_TEMPERATURE,
             messages=messages,
             tools=LEGAL_TOOLS,
             tool_choice="auto",
@@ -150,6 +151,7 @@ def run_evaluator(
         response = client.chat.completions.create(
             model=model,
             max_tokens=MAX_TOKENS["evaluator"],
+            temperature=LABELER_TEMPERATURE,
             messages=messages,
         )
         raw = response.choices[0].message.content or ""
