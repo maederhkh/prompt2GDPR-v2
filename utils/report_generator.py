@@ -21,6 +21,8 @@ def generate_report(result: dict, out_path: Path) -> None:
     verified = result.get("verified_clauses", [])
     flagged = result.get("flagged_clauses", [])
 
+    label_panel = result.get("label_panel", {})
+
     policy_name = result.get("policy_name", "unknown")
     assessment_date = finalizer.get("assessment_date", "N/A")
     overall_label = finalizer.get("overall_label", "N/A")
@@ -275,6 +277,73 @@ def generate_report(result: dict, out_path: Path) -> None:
         for agent, model in agent_models.items():
             role = role_labels.get(agent, agent)
             lines.append(f"| {agent} | {role} | `{model}` |")
+        lines.append(f"")
+
+    # -----------------------------------------------------------------------
+    # Label Panel
+    # -----------------------------------------------------------------------
+    if label_panel and label_panel.get("per_clause"):
+        lines.append(f"---")
+        lines.append(f"")
+        lines.append(f"## Label Panel")
+        lines.append(f"")
+        blind_on = label_panel.get("blind_labeler_enabled", False)
+
+        # Model legend
+        first = label_panel["per_clause"][0]
+        def _model_of(cell):
+            return cell.get("model") if isinstance(cell, dict) else "n/a"
+        lines.append(f"**Models:** "
+                     f"Evaluator = `{_model_of(first.get('evaluator'))}` | "
+                     f"Reflector A = `{_model_of(first.get('reflector_a'))}` | "
+                     f"Reflector B = `{_model_of(first.get('reflector_b'))}`"
+                     + (f" | Blind A = `{_model_of(first.get('blind_a'))}` | "
+                        f"Blind B = `{_model_of(first.get('blind_b'))}`" if blind_on else ""))
+        lines.append(f"")
+
+        def _lab(cell):
+            return cell.get("label") if isinstance(cell, dict) else "—"
+
+        if blind_on:
+            lines.append(f"| Clause | Evaluator | Reflector A | Reflector B | Blind A | Blind B | Status |")
+            lines.append(f"|---|---|---|---|---|---|---|")
+            for row in label_panel["per_clause"]:
+                status = "⚠️ Disputed" if row.get("disputed") else "✅ Agreed"
+                lines.append(
+                    f"| {row['clause_id']} | {_lab(row.get('evaluator'))} | "
+                    f"{_lab(row.get('reflector_a'))} | {_lab(row.get('reflector_b'))} | "
+                    f"{_lab(row.get('blind_a'))} | {_lab(row.get('blind_b'))} | {status} |"
+                )
+        else:
+            lines.append(f"| Clause | Evaluator | Reflector A | Reflector B | Status |")
+            lines.append(f"|---|---|---|---|---|")
+            for row in label_panel["per_clause"]:
+                status = "⚠️ Disputed" if row.get("disputed") else "✅ Agreed"
+                lines.append(
+                    f"| {row['clause_id']} | {_lab(row.get('evaluator'))} | "
+                    f"{_lab(row.get('reflector_a'))} | {_lab(row.get('reflector_b'))} | {status} |"
+                )
+        lines.append(f"")
+        lines.append(f"- Disputed clauses: **{label_panel.get('disputed_count', 0)}**")
+
+        # Anchoring summary
+        summary = label_panel.get("anchoring_summary")
+        if blind_on and summary:
+            lines.append(f"")
+            lines.append(f"### Anchoring Summary")
+            lines.append(f"")
+            for ref_key, label in (("reflector_a", "Reflector A"), ("reflector_b", "Reflector B")):
+                s = summary.get(ref_key, {})
+                rate = s.get("shift_rate")
+                rate_str = f"{rate:.0%}" if rate is not None else "n/a"
+                lines.append(
+                    f"- {label} (`{s.get('model')}`): changed its label on "
+                    f"**{s.get('clauses_changed', 0)}/{s.get('total', 0)}** clause(s) "
+                    f"after seeing the Evaluator — anchoring shift **{rate_str}**."
+                )
+        elif not blind_on:
+            lines.append(f"")
+            lines.append(f"_Blind labeling disabled for this run — anchoring not measured._")
         lines.append(f"")
 
     # -----------------------------------------------------------------------
