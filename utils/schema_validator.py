@@ -184,6 +184,8 @@ def validate_reflector_output(data: dict) -> list[str]:
         errors.append("Missing required field: review_status")
     elif data["review_status"] not in {"clean", "errors_found", "errors_unresolved"}:
         errors.append(f"Invalid review_status: '{data['review_status']}'.")
+    if "clause_labels" in data and not isinstance(data["clause_labels"], list):
+        errors.append("clause_labels must be a list when present.")
     return errors
 
 
