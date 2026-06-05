@@ -8,7 +8,7 @@ whether to trigger retries.
 
 from openai import OpenAI
 
-from config import MAX_TOKENS
+from config import MAX_TOKENS, LABELER_TEMPERATURE
 from prompts.reflector_prompt import REFLECTOR_SYSTEM, build_reflector_prompt
 from utils.schema_validator import parse_and_repair, validate_reflector_output
 
@@ -45,6 +45,7 @@ def run_reflector(
     response = client.chat.completions.create(
         model=model,
         max_tokens=MAX_TOKENS["reflector"],
+        temperature=LABELER_TEMPERATURE,
         messages=[
             {"role": "system", "content": REFLECTOR_SYSTEM},
             {"role": "user", "content": user_prompt},
