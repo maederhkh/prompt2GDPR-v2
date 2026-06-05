@@ -158,14 +158,15 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
         models=agent_models,
         blind_enabled=blind_enabled,
     )
-    print(f"  [Label Panel] {label_panel['disputed_count']} disputed clause(s).")
+    print("\n[Label Panel] Assembling per-clause labels...")
+    print(f"  {label_panel['disputed_count']} disputed clause(s).")
     if blind_enabled and label_panel.get("anchoring_summary"):
         for ref_key in ("reflector_a", "reflector_b"):
-            s = label_panel["anchoring_summary"][ref_key]
-            rate = s["shift_rate"]
+            summary = label_panel["anchoring_summary"][ref_key]
+            rate = summary["shift_rate"]
             rate_str = f"{rate:.0%}" if rate is not None else "n/a"
-            print(f"  [Anchoring] {ref_key} ({s['model']}): "
-                  f"{s['clauses_changed']}/{s['total']} changed ({rate_str}).")
+            print(f"  [Anchoring] {ref_key} ({summary['model']}): "
+                  f"{summary['clauses_changed']}/{summary['total']} changed ({rate_str}).")
 
     final_reflector_output = initial_reflector_output
     retry_count = 0
