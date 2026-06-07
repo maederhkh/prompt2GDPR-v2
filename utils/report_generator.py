@@ -22,6 +22,7 @@ def generate_report(result: dict, out_path: Path) -> None:
     flagged = result.get("flagged_clauses", [])
 
     label_panel = result.get("label_panel", {})
+    run_metadata = result.get("run_metadata", {})
 
     policy_name = result.get("policy_name", "unknown")
     assessment_date = finalizer.get("assessment_date", "N/A")
@@ -44,6 +45,27 @@ def generate_report(result: dict, out_path: Path) -> None:
     lines.append(f"| **Confidence** | {confidence} |")
     lines.append(f"| **Human Review Required** | Yes |")
     lines.append(f"")
+
+    # -----------------------------------------------------------------------
+    # Run Metadata (provenance)
+    # -----------------------------------------------------------------------
+    if run_metadata:
+        gc = run_metadata.get("git_commit", {})
+        sha = gc.get("sha", "unknown")
+        commit_str = f"{sha} (dirty)" if gc.get("dirty") else sha
+        lines.append(f"## Run Metadata")
+        lines.append(f"")
+        lines.append(f"| Field | Value |")
+        lines.append(f"|---|---|")
+        lines.append(f"| **Run ID** | {run_metadata.get('run_id', 'N/A')} |")
+        lines.append(f"| **Timestamp (UTC)** | {run_metadata.get('utc_timestamp', 'N/A')} |")
+        lines.append(f"| **Code commit** | `{commit_str}` |")
+        lines.append(f"| **Policy file** | {run_metadata.get('policy_file', 'N/A')} |")
+        lines.append(f"| **Policy SHA-256** | `{run_metadata.get('policy_sha256', 'N/A')}` |")
+        lines.append(f"| **Temperature** | {run_metadata.get('temperature', 'N/A')} |")
+        lines.append(f"| **Blind labeler** | {'enabled' if run_metadata.get('blind_enabled') else 'disabled'} |")
+        lines.append(f"| **Clause count** | {run_metadata.get('clause_count', 'N/A')} |")
+        lines.append(f"")
 
     # -----------------------------------------------------------------------
     # Clause extraction summary
