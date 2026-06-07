@@ -30,9 +30,10 @@ from agents.evaluator import run_evaluator
 from agents.reflector import run_reflector, errors_for_agent, build_retry_instructions
 from utils.reflector_merge import merge_reflector_outputs
 from agents.finalizer import run_finalizer
+from utils.run_metadata import build_run_metadata
 from agents.blind_labeler import run_blind_labeler
 from utils.label_panel import build_label_panel, annotate_finalizer_with_disputes
-from config import DEFAULT_MODEL, DEFAULT_AGENT_MODELS, OPENROUTER_BASE_URL, ENABLE_BLIND_LABELER
+from config import DEFAULT_MODEL, DEFAULT_AGENT_MODELS, OPENROUTER_BASE_URL, ENABLE_BLIND_LABELER, LABELER_TEMPERATURE
 from utils.verifier import verify_clauses
 from utils.report_generator import generate_report
 
@@ -85,13 +86,23 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
         policy_text,
     )
     print(f"  Verified: {len(verified_clauses)}  |  Flagged: {len(flagged_clauses)}")
+
+    # Build run provenance once, now that the verified clause count is known.
+    # Used by both the empty-result early return and the normal result below.
+    run_metadata = build_run_metadata(
+        policy_path=policy_path,
+        temperature=LABELER_TEMPERATURE,
+        blind_enabled=blind_enabled,
+        clause_count=len(verified_clauses),
+    )
+
     if flagged_clauses:
         for fc in flagged_clauses:
             print(f"  ! Flagged: {fc.get('clause_id')} — {fc.get('verification_note', '')[:80]}")
 
     if not verified_clauses:
         print("  WARNING: No verified clauses. Pipeline cannot continue with evaluation.")
-        return _empty_result(policy_name, extractor_output, flagged_clauses)
+        return _empty_result(policy_name, extractor_output, flagged_clauses, run_metadata)
 
     # ------------------------------------------------------------------
     # Step 3: Evaluator (Agent 2) — with retry support
@@ -254,6 +265,7 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
     annotate_finalizer_with_disputes(finalizer_output, label_panel)
 
     return {
+        "run_metadata": run_metadata,
         "policy_name": policy_name,
         "agent_models": agent_models,
         "extractor_output": extractor_output,
@@ -280,15 +292,21 @@ def save_result(result: dict, output_dir: Path, run_index: int = 1) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     policy_name = result.get("policy_name", "unknown")
 
+    # Unique, time-based run id from run_metadata (falls back to run{N} if absent).
+    run_id = result.get("run_metadata", {}).get("run_id") or f"run{run_index}"
+    # Distinguish multiple runs within one invocation (--runs N>1).
+    multi_suffix = f"-run{run_index}" if run_index > 1 else ""
+    stem = f"{policy_name}_{run_id}{multi_suffix}"
+
     # JSON — full machine-readable output
-    json_path = output_dir / f"{policy_name}_run{run_index}.json"
+    json_path = output_dir / f"{stem}.json"
     json_path.write_text(
         json.dumps(result, indent=2, ensure_ascii=False, default=str),
         encoding="utf-8",
     )
 
     # Markdown — human-readable report
-    report_path = output_dir / f"{policy_name}_run{run_index}_report.md"
+    report_path = output_dir / f"{stem}_report.md"
     generate_report(result, report_path)
 
     # Cumulative model usage log — append one row per run for easy comparison
@@ -340,8 +358,10 @@ def _append_model_usage_log(result: dict, output_dir: Path, run_index: int) -> N
     print(f"Model log updated: {log_path}")
 
 
-def _empty_result(policy_name: str, extractor_output: dict, flagged_clauses: list) -> dict:
+def _empty_result(policy_name: str, extractor_output: dict, flagged_clauses: list,
+                  run_metadata: dict) -> dict:
     return {
+        "run_metadata": run_metadata,
         "policy_name": policy_name,
         "error": "No verified clauses — all extracted clauses failed string-match verification.",
         "extractor_output": extractor_output,
