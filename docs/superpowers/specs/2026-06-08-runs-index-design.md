@@ -106,7 +106,7 @@ run completes
   → save_result(result, output_dir, run_index)
       → writes {stem}.json and {stem}_report.md   (unchanged)
       → append_run_to_index(result, output_dir)
-            → build_index_row(result)  → 12 fields
+            → build_index_row(result)  → 13 fields
                 → append row to runs_index.md   (header if new)
                 → append row to runs_index.csv  (header if new)
 ```
