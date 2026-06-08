@@ -91,3 +91,44 @@ def build_index_row(result: dict) -> dict:
         "anchoring_a": _anchoring(lp, "reflector_a"),
         "anchoring_b": _anchoring(lp, "reflector_b"),
     }
+
+
+def _append_md(path: Path, values: list) -> None:
+    """Append one Markdown table row; write the header block if the file is new."""
+    new = not path.exists()
+    with path.open("a", encoding="utf-8") as f:
+        if new:
+            f.write("# Runs Index\n\n")
+            f.write("One row per pipeline run. Newest at the bottom.\n\n")
+            f.write("| " + " | ".join(MD_HEADERS) + " |\n")
+            f.write("|" + "|".join(["---"] * len(MD_HEADERS)) + "|\n")
+        f.write("| " + " | ".join(str(v) for v in values) + " |\n")
+
+
+def _append_csv(path: Path, values: list) -> None:
+    """Append one CSV row; write the header row if the file is new."""
+    new = not path.exists()
+    with path.open("a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if new:
+            writer.writerow(FIELDS)
+        writer.writerow(values)
+
+
+def append_run_to_index(result: dict, output_dir: Path) -> None:
+    """
+    Append this run's summary row to runs_index.md and runs_index.csv under
+    output_dir, creating each (with header) on first write.
+
+    Never raises: a failure to write the index must not crash a pipeline run —
+    the per-run JSON and report remain the source of truth.
+    """
+    try:
+        row = build_index_row(result)
+        values = [row[field] for field in FIELDS]
+        output_dir.mkdir(parents=True, exist_ok=True)
+        _append_md(output_dir / "runs_index.md", values)
+        _append_csv(output_dir / "runs_index.csv", values)
+        print(f"Runs index updated: {output_dir / 'runs_index.csv'}")
+    except Exception as exc:  # index is a convenience aggregate; never fatal
+        print(f"  [runs_index] WARNING: could not update index: {exc}")
