@@ -39,7 +39,9 @@ This is a deliberately small step. It is post-processing only: it reads the resu
 
 ## 3. The index row — complete column reference
 
-Each row represents **one completed pipeline run** (one policy taken through the whole pipeline once). Rows are appended in run order; because `run_id` is a UTC timestamp, the table also sorts chronologically. Twelve columns:
+Each row represents **one completed pipeline run** (one policy taken through the whole pipeline once). Rows are appended in run order; because `run_id` is a UTC timestamp, the table also sorts chronologically.
+
+There are **13 CSV fields** (12 logical columns, with anchoring split into two adjacent fields `anchoring_a` and `anchoring_b` so the CSV holds one value per cell). Both the `.md` and `.csv` use the same 13 fields in the same order:
 
 | # | Column (CSV header) | MD header | Type | Source field | Notes |
 |---|---|---|---|---|---|
@@ -79,13 +81,13 @@ When blind is disabled the last two cells render `—` and `blind` renders `off`
 A small, mostly-pure module.
 
 - `build_index_row(result: dict) -> dict`
-  - Pure function. Maps a result dict to an ordered dict of the 12 column values (keys = CSV headers in §3).
+  - Pure function. Maps a result dict to an ordered dict of the 13 field values (keys = CSV headers in §3).
   - Uses defensive `.get(...)` with fallbacks throughout — never raises on a missing key.
   - `commit`: `sha` plus ` (dirty)` suffix when dirty is true; `sha` defaults to `unknown`.
   - `blind`: `on`/`off` from `blind_enabled`.
   - `anchoring_a`/`anchoring_b`: the two `shift_rate` values, or `—` when `anchoring_summary` is absent/`None` (blind disabled).
 - `append_run_to_index(result: dict, output_dir: Path) -> None`
-  - Builds the row via `build_index_row`.
+  - Builds the row via `build_index_row` (13 ordered fields).
   - Appends to `runs_index.md` and `runs_index.csv` under `output_dir`, creating each with a header on first write and appending one data row thereafter.
   - CSV is written via Python's `csv` module (defensive quoting) so a stray comma in any value cannot break a row.
   - Markdown is appended as a single `| ... |` line; the header (column row + `|---|` separator) is written only when the file does not yet exist.
@@ -125,7 +127,7 @@ run completes
 This repo has no pytest; tests are standalone `assert` scripts run as `python tests/<file>.py`, printing `OK` on success, using the `sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))` shim.
 
 `tests/test_runs_index.py`:
-- `build_index_row` maps a synthetic **full** result (with run_metadata, finalizer, reflector, label_panel incl. anchoring) to all 12 fields with correct values (commit shows `(dirty)` when dirty; `blind` is `on`; anchoring shows the two rates).
+- `build_index_row` maps a synthetic **full** result (with run_metadata, finalizer, reflector, label_panel incl. anchoring) to all 13 fields with correct values (commit shows `(dirty)` when dirty; `blind` is `on`; anchoring shows the two rates).
 - `build_index_row` on a synthetic **empty-result** (no verified clauses, no label_panel) yields a valid row with safe fallbacks (`clauses == 0`, anchoring `—`, no exception).
 - `append_run_to_index` on a fresh temp dir creates both `runs_index.md` and `runs_index.csv`, each with exactly one header and one data row; a second call appends a second data row **without** a second header (so 2 data rows, 1 header in each file).
 
