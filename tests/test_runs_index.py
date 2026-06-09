@@ -16,6 +16,7 @@ def _full_result():
         "policy_name": "policy_short",
         "run_metadata": {
             "run_id": "20260607T143022Z",
+            "utc_timestamp": "2026-06-07T14:30:22Z",
             "policy_file": "policy_short.txt",
             "policy_sha256": "a1b2c3d4",
             "git_commit": {"sha": "cac701e", "dirty": True},
@@ -59,6 +60,7 @@ def test_build_index_row_full():
     # exact field order matches FIELDS
     assert list(row.keys()) == FIELDS, list(row.keys())
     assert row["run_id"] == "20260607T143022Z"
+    assert row["date"] == "2026-06-07 14:30 UTC"
     assert row["policy"] == "policy_short.txt"
     assert row["policy_sha256"] == "a1b2c3d4"
     assert row["commit"] == "cac701e (dirty)"
@@ -77,6 +79,7 @@ def test_build_index_row_empty_result():
     row = build_index_row(_empty_result())
     assert list(row.keys()) == FIELDS
     assert row["run_id"] == "20260101T000000Z"
+    assert row["date"] == "N/A"
     assert row["clauses"] == 0
     assert row["overall_label"] == "N/A"
     assert row["confidence"] == "N/A"

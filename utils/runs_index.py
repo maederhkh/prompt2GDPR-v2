@@ -15,6 +15,7 @@ from pathlib import Path
 # Markdown columns. CSV uses these keys verbatim; Markdown uses MD_HEADERS below.
 FIELDS = [
     "run_id",
+    "date",
     "policy",
     "policy_sha256",
     "commit",
@@ -31,6 +32,7 @@ FIELDS = [
 
 MD_HEADERS = [
     "Run ID",
+    "Date (UTC)",
     "Policy",
     "Policy hash",
     "Commit",
@@ -46,6 +48,16 @@ MD_HEADERS = [
 ]
 
 EM_DASH = "—"  # — shown when a value is not applicable (e.g. blind disabled)
+
+
+def _human_date(run_metadata: dict) -> str:
+    """Render run_metadata['utc_timestamp'] (YYYY-MM-DDTHH:MM:SSZ) as
+    'YYYY-MM-DD HH:MM UTC' (minute precision). Returns 'N/A' if absent/malformed."""
+    ts = run_metadata.get("utc_timestamp")
+    if not isinstance(ts, str) or "T" not in ts:
+        return "N/A"
+    date_part, _, time_part = ts.partition("T")
+    return f"{date_part} {time_part[:5]} UTC"
 
 
 def _anchoring(label_panel: dict, side_key: str):
@@ -78,6 +90,7 @@ def build_index_row(result: dict) -> dict:
 
     return {
         "run_id": rm.get("run_id", "N/A"),
+        "date": _human_date(rm),
         "policy": rm.get("policy_file") or result.get("policy_name", "N/A"),
         "policy_sha256": rm.get("policy_sha256", "N/A"),
         "commit": commit,
