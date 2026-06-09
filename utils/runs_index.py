@@ -74,7 +74,7 @@ def _anchoring(label_panel: dict, side_key: str):
 
 def build_index_row(result: dict) -> dict:
     """
-    Map a pipeline result dict to an ordered dict of the 13 index fields.
+    Map a pipeline result dict to an ordered dict of the 14 index fields.
 
     Defensive throughout: every field falls back to a safe default so a missing
     key (older or empty-result runs) never raises.
@@ -106,32 +106,43 @@ def build_index_row(result: dict) -> dict:
     }
 
 
-def _append_md(path: Path, values: list) -> None:
-    """Append one Markdown table row; write the header block if the file is new."""
-    new = not path.exists()
-    with path.open("a", encoding="utf-8") as f:
-        if new:
-            f.write("# Runs Index\n\n")
-            f.write("One row per pipeline run. Newest at the bottom.\n\n")
-            f.write("| " + " | ".join(MD_HEADERS) + " |\n")
-            f.write("|" + "|".join(["---"] * len(MD_HEADERS)) + "|\n")
-        f.write("| " + " | ".join(str(v) for v in values) + " |\n")
+def _backup(path: Path) -> None:
+    """If path exists, rename it to '<name>.bak', replacing any existing backup."""
+    if path.exists():
+        bak = path.with_name(path.name + ".bak")
+        if bak.exists():
+            bak.unlink()
+        path.rename(bak)
 
 
-def _append_csv(path: Path, values: list) -> None:
-    """Append one CSV row; write the header row if the file is new."""
-    new = not path.exists()
-    with path.open("a", newline="", encoding="utf-8") as f:
+def _write_csv(path: Path, rows: list) -> None:
+    """Write the CSV fresh: FIELDS header followed by every row (newest first)."""
+    with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        if new:
-            writer.writerow(FIELDS)
-        writer.writerow(values)
+        writer.writerow(FIELDS)
+        writer.writerows(rows)
+
+
+def _write_md(path: Path, rows: list) -> None:
+    """Write the Markdown index fresh: header block + column header + every row."""
+    with path.open("w", encoding="utf-8") as f:
+        f.write("# Runs Index\n\n")
+        f.write("One row per pipeline run. Newest at the top.\n\n")
+        f.write("| " + " | ".join(MD_HEADERS) + " |\n")
+        f.write("|" + "|".join(["---"] * len(MD_HEADERS)) + "|\n")
+        for values in rows:
+            f.write("| " + " | ".join(str(v) for v in values) + " |\n")
 
 
 def append_run_to_index(result: dict, output_dir: Path) -> None:
     """
-    Append this run's summary row to runs_index.md and runs_index.csv under
-    output_dir, creating each (with header) on first write.
+    Prepend this run's summary row to runs_index.md and runs_index.csv under
+    output_dir, so the most recently written run appears on top. Creates the
+    files on first write.
+
+    If an existing index uses an older column schema (its CSV header does not
+    match FIELDS), it is renamed to '<name>.bak' and a fresh index is started —
+    no data is deleted, the old rows are preserved in the .bak file.
 
     Never raises: a failure to write the index must not crash a pipeline run —
     the per-run JSON and report remain the source of truth.
@@ -140,8 +151,23 @@ def append_run_to_index(result: dict, output_dir: Path) -> None:
         row = build_index_row(result)
         values = [row[field] for field in FIELDS]
         output_dir.mkdir(parents=True, exist_ok=True)
-        _append_md(output_dir / "runs_index.md", values)
-        _append_csv(output_dir / "runs_index.csv", values)
-        print(f"Runs index updated: {output_dir / 'runs_index.csv'}")
+        csv_path = output_dir / "runs_index.csv"
+        md_path = output_dir / "runs_index.md"
+
+        existing = []
+        if csv_path.exists():
+            with csv_path.open(encoding="utf-8", newline="") as f:
+                rows = list(csv.reader(f))
+            if rows and rows[0] == FIELDS:
+                existing = rows[1:]          # current schema — keep prior rows
+            else:
+                _backup(csv_path)            # old/unknown schema — start fresh
+                _backup(md_path)
+                existing = []
+
+        all_rows = [values] + existing       # newest row on top
+        _write_csv(csv_path, all_rows)
+        _write_md(md_path, all_rows)
+        print(f"Runs index updated: {csv_path}")
     except Exception as exc:  # index is a convenience aggregate; never fatal
         print(f"  [runs_index] WARNING: could not update index: {exc}")
