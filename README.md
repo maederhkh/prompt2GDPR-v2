@@ -1,6 +1,6 @@
 # prompt2GDPR-v2
 
-An agentic workflow for assessing privacy policy compliance with **GDPR Article 5(1)(b) — Purpose Limitation**, built as a research extension of a master's thesis at the University of Bologna (2025/2026).
+An agentic workflow for assessing privacy policy compliance with **GDPR Article 5(1)(b)  Purpose Limitation**, built as a research extension of a master's thesis at the University of Bologna (2025/2026).
 
 The system replaces single-prompt LLM evaluation with a structured multi-agent pipeline that is more evidence-grounded, more stable, and more explainable than the thesis baseline. Beyond producing a label, it **measures its own reliability**: independent dual auditing, a blind-labeling tier that quantifies anchoring bias, and full per-run provenance.
 
@@ -95,14 +95,14 @@ Three mechanisms turn the pipeline from "produces a label" into "produces a labe
 The Evaluator and Blind Labelers retrieve legal sources on demand rather than having them injected statically into the prompt. The model decides what it needs based on the clause content.
 
 **Primary sources** (binding law — consulted first):
-- `article_5_1b` — GDPR Article 5(1)(b)
-- `article_89` — GDPR Article 89 (research/archiving exceptions)
-- `recital_39` — Purpose specification at time of collection
-- `recital_50` — Compatible further processing criteria
-- `recital_157` — Scientific research and statistical purposes
+- `article_5_1b`: GDPR Article 5(1)(b)
+- `article_89`: GDPR Article 89 (research/archiving exceptions)
+- `recital_39`: Purpose specification at time of collection
+- `recital_50`: Compatible further processing criteria
+- `recital_157`: Scientific research and statistical purposes
 
-**Secondary sources** (authoritative, not binding — consulted only if primary is insufficient):
-- `wp29_purpose_limitation` — WP29 Opinion 03/2013 (WP203) key excerpts
+**Secondary sources** (authoritative, not binding  consulted only if primary is insufficient):
+- `wp29_purpose_limitation`  WP29 Opinion 03/2013 (WP203) key excerpts
 
 All references consulted are logged in the evaluator output under `references_used[]`.
 
@@ -155,8 +155,8 @@ Common options:
 Each run writes to `output/results/`:
 
 - **`<policy>_<run_id>.json`** — the full result: all agent outputs (scout, extractor, evaluator, both reflectors, blind labelers, finalizer), verified/flagged clauses, the label panel, legal references consulted, inter-reflector agreement, anchoring shift rates, M1–M5 evaluation metrics, and run metadata.
-- **`<policy>_<run_id>_report.md`** — a human-readable report, including a Run Metadata block for provenance.
-- **`runs_index.md` / `runs_index.csv`** — a cumulative index with **one summary row per run** (run ID, policy, commit, overall label, confidence, clause count, agreement rate, retries, disputed count, blind on/off, anchoring shift A/B). The `.md` is for a quick glance; the `.csv` opens directly in Excel/pandas.
+- **`<policy>_<run_id>_report.md`**  a human-readable report, including a Run Metadata block for provenance.
+- **`runs_index.md` / `runs_index.csv`**  a cumulative index with **one summary row per run** (run ID, policy, commit, overall label, confidence, clause count, agreement rate, retries, disputed count, blind on/off, anchoring shift A/B). The `.md` is for a quick glance; the `.csv` opens directly in Excel/pandas.
 
 The final compliance label is one of `Compliant` / `Partially Compliant` / `Non-Compliant`, with a confidence level of `high` / `medium` / `low` and always `human_review_recommended: true`.
 
@@ -164,7 +164,7 @@ The final compliance label is one of `Compliant` / `Partially Compliant` / `Non-
 
 Every result is stamped with provenance so any run can be reproduced and located:
 
-- `run_id` — compact UTC timestamp (`YYYYMMDDTHHMMSSZ`), also the output filename stem
+- `run_id`  compact UTC timestamp (`YYYYMMDDTHHMMSSZ`), also the output filename stem
 - `utc_timestamp`, `git_commit` (sha + dirty flag), `policy_file`, `policy_sha256`
 - `temperature`, `blind_enabled`, `clause_count`
 
