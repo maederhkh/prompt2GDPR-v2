@@ -1,9 +1,9 @@
 """
 Runs index — a cumulative per-run summary table.
 
-Appends one row per pipeline run to runs_index.md (readable) and runs_index.csv
-(Excel/pandas), built from the result dict the pipeline already produces. Pure
-stdlib; writing the index must never crash a run.
+Records one row per pipeline run in runs_index.md (readable) and runs_index.csv
+(Excel/pandas), newest on top, built from the result dict the pipeline already
+produces. Pure stdlib; writing the index must never crash a run.
 
 Replaces the older model_usage_log.md.
 """
