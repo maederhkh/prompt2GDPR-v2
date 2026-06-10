@@ -74,10 +74,13 @@ def generate_report(result: dict, out_path: Path) -> None:
     lines.append(f"")
     lines.append(f"## Clause Extraction")
     lines.append(f"")
-    coverage = "Complete" if extractor.get("coverage_complete", True) else "**Incomplete — policy may contain more relevant clauses**"
+    _mode = extractor.get("extraction_mode")
+    _mode_label = {"two_pass": "two-pass", "single_pass": "single-pass (fallback)"}.get(_mode, "unknown")
+    _coverage_conf = {"two_pass": "high", "single_pass": "low"}.get(_mode, "unknown")
     lines.append(f"- Verified clauses: **{len(verified)}**")
     lines.append(f"- Flagged clauses (failed verification): **{len(flagged)}**")
-    lines.append(f"- Coverage: {coverage}")
+    lines.append(f"- Extraction mode: {_mode_label}")
+    lines.append(f"- Coverage confidence: {_coverage_conf}")
     if extractor.get("extraction_notes"):
         lines.append(f"- Extractor notes: {extractor['extraction_notes']}")
     lines.append(f"")

@@ -34,6 +34,7 @@ def _full_result():
                 "reflector_b": {"shift_rate": 0.37},
             },
         },
+        "extractor_output": {"extraction_mode": "two_pass"},
     }
 
 
@@ -67,6 +68,7 @@ def test_build_index_row_full():
     assert row["overall_label"] == "Partially compliant"
     assert row["confidence"] == "low"
     assert row["clauses"] == 68
+    assert row["coverage"] == "high"
     assert row["agreement_rate"] == 0.86
     assert row["retries"] == 1
     assert row["disputed"] == 26
@@ -81,6 +83,7 @@ def test_build_index_row_empty_result():
     assert row["run_id"] == "20260101T000000Z"
     assert row["date"] == "N/A"
     assert row["clauses"] == 0
+    assert row["coverage"] == "—"
     assert row["overall_label"] == "N/A"
     assert row["confidence"] == "N/A"
     assert row["agreement_rate"] == "N/A"
@@ -89,6 +92,13 @@ def test_build_index_row_empty_result():
     assert row["commit"] == "abc1234"        # no (dirty) suffix
     assert row["anchoring_a"] == "—"     # em dash
     assert row["anchoring_b"] == "—"
+
+
+def test_build_index_row_single_pass_coverage():
+    r = _full_result()
+    r["extractor_output"] = {"extraction_mode": "single_pass"}
+    row = build_index_row(r)
+    assert row["coverage"] == "low"
 
 
 def test_append_newest_first():
@@ -147,6 +157,7 @@ def test_schema_mismatch_backs_up():
 if __name__ == "__main__":
     test_build_index_row_full()
     test_build_index_row_empty_result()
+    test_build_index_row_single_pass_coverage()
     test_append_newest_first()
     test_schema_mismatch_backs_up()
     print("OK")

@@ -137,6 +137,7 @@ def run_extractor(
         "extracted_clauses": all_clauses,
         "extraction_notes": notes,
         "coverage_complete": True,
+        "extraction_mode": "two_pass",
         "sections_processed": [s["name"] for s in sections],
         "self_check_report": self_check_report,
     }
@@ -260,6 +261,7 @@ def _run_single_pass(
             "Extractor output failed validation:\n" + "\n".join(f"  - {e}" for e in errors)
         )
 
+    data["extraction_mode"] = "single_pass"
     return data
 
 
