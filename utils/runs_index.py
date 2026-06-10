@@ -22,6 +22,7 @@ FIELDS = [
     "overall_label",
     "confidence",
     "clauses",
+    "coverage",
     "agreement_rate",
     "retries",
     "disputed",
@@ -39,6 +40,7 @@ MD_HEADERS = [
     "Overall label",
     "Confidence",
     "Clauses",
+    "Coverage",
     "Agreement",
     "Retries",
     "Disputed",
@@ -74,7 +76,7 @@ def _anchoring(label_panel: dict, side_key: str):
 
 def build_index_row(result: dict) -> dict:
     """
-    Map a pipeline result dict to an ordered dict of the 14 index fields.
+    Map a pipeline result dict to an ordered dict of the 15 index fields.
 
     Defensive throughout: every field falls back to a safe default so a missing
     key (older or empty-result runs) never raises.
@@ -84,6 +86,8 @@ def build_index_row(result: dict) -> dict:
     refl = result.get("final_reflector_output", {}) or {}
     lp = result.get("label_panel", {}) or {}
     gc = rm.get("git_commit", {}) or {}
+    eo = result.get("extractor_output", {}) or {}
+    coverage = {"two_pass": "high", "single_pass": "low"}.get(eo.get("extraction_mode"), EM_DASH)
 
     sha = gc.get("sha", "unknown")
     commit = f"{sha} (dirty)" if gc.get("dirty") else sha
@@ -97,6 +101,7 @@ def build_index_row(result: dict) -> dict:
         "overall_label": fin.get("overall_label", "N/A"),
         "confidence": fin.get("confidence", "N/A"),
         "clauses": rm.get("clause_count", len(result.get("verified_clauses", []))),
+        "coverage": coverage,
         "agreement_rate": refl.get("agreement_rate", "N/A"),
         "retries": result.get("retry_count", 0),
         "disputed": lp.get("disputed_count", 0),
