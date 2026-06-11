@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.runs_index import FIELDS
-from utils.runs_summary import load_index_rows, summarize
+from utils.runs_summary import load_index_rows, summarize, build_summary_md
 
 
 def _row(**overrides):
@@ -111,6 +111,30 @@ def test_load_well_formed_csv():
         shutil.rmtree(d)
 
 
+def test_build_summary_md_per_policy():
+    rows = [
+        _row(policy="b_policy.txt"),
+        _row(run_id="2", policy="a_policy.txt", coverage="low"),
+    ]
+    md = build_summary_md(rows)
+    assert md.startswith("# Runs Summary")
+    assert "## Overall" in md and "## Per-policy" in md
+    # one section per distinct policy, alphabetical order
+    ia = md.index("### a_policy.txt")
+    ib = md.index("### b_policy.txt")
+    assert ia < ib
+    # denominator rendered on averages; fallback rate from 1 high / 1 low
+    assert "(from 2 of 2 runs)" in md
+    assert "fallback rate 50%" in md
+
+
+def test_build_summary_md_empty():
+    md = build_summary_md([])
+    assert "0 run(s)" in md
+    assert "## Overall" in md
+    assert "_No runs recorded yet._" in md
+
+
 if __name__ == "__main__":
     test_summarize_counts_and_averages()
     test_summarize_all_na_column_is_none()
@@ -118,4 +142,6 @@ if __name__ == "__main__":
     test_summarize_empty()
     test_load_rejects_old_schema()
     test_load_well_formed_csv()
+    test_build_summary_md_per_policy()
+    test_build_summary_md_empty()
     print("OK")

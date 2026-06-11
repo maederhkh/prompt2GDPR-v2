@@ -93,3 +93,99 @@ def summarize(rows: list) -> dict:
         "anchoring_a": _num_stats(rows, "anchoring_a"),
         "anchoring_b": _num_stats(rows, "anchoring_b"),
     }
+
+
+def _fmt(x: float) -> str:
+    """Format a number compactly: 68.0 -> '68', 0.875 -> '0.88'."""
+    return f"{x:.2f}".rstrip("0").rstrip(".")
+
+
+def _pct(part: int, total: int) -> str:
+    """'part of total' as a whole percent, e.g. '33%'. '0%' when total is 0."""
+    return f"{100 * part / total:.0f}%" if total else "0%"
+
+
+def _avg_with_denominator(stats, total: int) -> str:
+    """'0.88 (from 5 of 7 runs)', or 'n/a (0 of 7 runs)' when no numeric cells."""
+    if stats is None:
+        return f"n/a (0 of {total} runs)"
+    return f"{_fmt(stats['avg'])} (from {stats['n']} of {total} runs)"
+
+
+def _dist_line(counter, total: int) -> str:
+    """'Compliant 3 (60%), Non-Compliant 2 (40%)' — labels sorted alphabetically."""
+    parts = [
+        f"{label} {count} ({_pct(count, total)})"
+        for label, count in sorted(counter.items())
+    ]
+    return ", ".join(parts) if parts else "n/a"
+
+
+def _render_block(s: dict, h: str) -> list:
+    """Render one stats block as markdown lines; h is the heading prefix
+    ('###' under Overall, '####' under a per-policy section)."""
+    n = s["runs"]
+    lines = [f"{h} Volume & coverage"]
+    lines.append(f"- Runs: {n}")
+    dr = s["date_range"]
+    lines.append(f"- Date range: {dr[0]} → {dr[1]}" if dr else "- Date range: n/a")
+    cl = s["clauses"]
+    if cl:
+        lines.append(
+            f"- Clauses: avg {_fmt(cl['avg'])} (min {_fmt(cl['min'])}, "
+            f"max {_fmt(cl['max'])}; from {cl['n']} of {n} runs)"
+        )
+    else:
+        lines.append(f"- Clauses: n/a (0 of {n} runs)")
+    cov = s["coverage"]
+    cov_line = f"- Coverage: {cov['high']} high / {cov['low']} low / {cov['unknown']} unknown"
+    if cov["fallback_rate"] is not None:
+        cov_line += f" — fallback rate {100 * cov['fallback_rate']:.0f}%"
+    lines.append(cov_line)
+    lines.append("")
+    lines.append(f"{h} Compliance outcomes")
+    lines.append(f"- Overall label: {_dist_line(s['labels'], n)}")
+    lines.append(f"- Confidence: {_dist_line(s['confidence'], n)}")
+    lines.append("")
+    lines.append(f"{h} Reliability")
+    lines.append(f"- Avg agreement: {_avg_with_denominator(s['agreement'], n)}")
+    lines.append(
+        f"- Retries: avg {_avg_with_denominator(s['retries'], n)} — "
+        f"{_pct(s['retry_runs'], n)} of runs needed ≥1 retry"
+    )
+    lines.append(
+        f"- Disputed: avg {_avg_with_denominator(s['disputed'], n)} — "
+        f"{_pct(s['disputed_runs'], n)} of runs had ≥1 dispute"
+    )
+    lines.append(
+        f"- Anchoring shift: A {_avg_with_denominator(s['anchoring_a'], n)}, "
+        f"B {_avg_with_denominator(s['anchoring_b'], n)}"
+    )
+    return lines
+
+
+def build_summary_md(all_rows: list) -> str:
+    """Render the full summary: Overall block, then one block per policy."""
+    lines = [
+        "# Runs Summary",
+        "",
+        f"Generated from runs_index.csv — {len(all_rows)} run(s). "
+        "Regenerate with `python analyze_runs.py`.",
+        "",
+        "## Overall",
+        "",
+    ]
+    lines.extend(_render_block(summarize(all_rows), "###"))
+    lines.append("")
+    lines.append("## Per-policy")
+    policies = sorted({r.get("policy", "N/A") for r in all_rows})
+    if not policies:
+        lines.append("")
+        lines.append("_No runs recorded yet._")
+    for p in policies:
+        lines.append("")
+        lines.append(f"### {p}")
+        lines.append("")
+        rows_p = [r for r in all_rows if r.get("policy", "N/A") == p]
+        lines.extend(_render_block(summarize(rows_p), "####"))
+    return "\n".join(lines) + "\n"
