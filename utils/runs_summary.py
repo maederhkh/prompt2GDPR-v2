@@ -9,6 +9,7 @@ this — regenerate on demand with:  python analyze_runs.py
 """
 
 import csv
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -189,3 +190,33 @@ def build_summary_md(all_rows: list) -> str:
         rows_p = [r for r in all_rows if r.get("policy", "N/A") == p]
         lines.extend(_render_block(summarize(rows_p), "####"))
     return "\n".join(lines) + "\n"
+
+
+def main(output_dir="output/results") -> int:
+    """
+    Load the index from output_dir, print the summary to the terminal, and
+    write runs_summary.md next to the index. Returns a process exit code
+    (always 0 — a missing or outdated index is reported, not an error).
+    """
+    # Windows consoles/pipes may not be UTF-8; degrade gracefully instead of
+    # crashing on em dashes/arrows when output is redirected.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
+
+    output_dir = Path(output_dir)
+    csv_path = output_dir / "runs_index.csv"
+    if not csv_path.exists():
+        print(f"No runs index found at {csv_path} — run the pipeline first.")
+        return 0
+    try:
+        rows = load_index_rows(csv_path)
+    except ValueError as exc:
+        print(f"Cannot summarize: {exc}")
+        return 0
+
+    md = build_summary_md(rows)
+    print(md)
+    out_path = output_dir / "runs_summary.md"
+    out_path.write_text(md, encoding="utf-8")
+    print(f"Summary written to {out_path}")
+    return 0

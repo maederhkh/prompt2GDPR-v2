@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.runs_index import FIELDS
-from utils.runs_summary import load_index_rows, summarize, build_summary_md
+from utils.runs_summary import load_index_rows, summarize, build_summary_md, main
 
 
 def _row(**overrides):
@@ -135,6 +135,47 @@ def test_build_summary_md_empty():
     assert "_No runs recorded yet._" in md
 
 
+def test_main_end_to_end():
+    d = Path(tempfile.mkdtemp())
+    try:
+        p = d / "runs_index.csv"
+        with p.open("w", newline="", encoding="utf-8") as f:
+            w = _csv.writer(f)
+            w.writerow(FIELDS)
+            for r in (_row(), _row(run_id="2", coverage="low", policy="other.txt")):
+                w.writerow([r[k] for k in FIELDS])
+        rc = main(output_dir=d)
+        assert rc == 0
+        out = (d / "runs_summary.md").read_text(encoding="utf-8")
+        assert "## Overall" in out and "### other.txt" in out
+    finally:
+        shutil.rmtree(d)
+
+
+def test_main_missing_index_writes_nothing():
+    d = Path(tempfile.mkdtemp())
+    try:
+        rc = main(output_dir=d)
+        assert rc == 0
+        assert not (d / "runs_summary.md").exists()
+    finally:
+        shutil.rmtree(d)
+
+
+def test_main_old_schema_writes_nothing():
+    d = Path(tempfile.mkdtemp())
+    try:
+        p = d / "runs_index.csv"
+        with p.open("w", newline="", encoding="utf-8") as f:
+            w = _csv.writer(f)
+            w.writerow(["run_id", "policy"])          # old header
+        rc = main(output_dir=d)
+        assert rc == 0
+        assert not (d / "runs_summary.md").exists()
+    finally:
+        shutil.rmtree(d)
+
+
 if __name__ == "__main__":
     test_summarize_counts_and_averages()
     test_summarize_all_na_column_is_none()
@@ -144,4 +185,7 @@ if __name__ == "__main__":
     test_load_well_formed_csv()
     test_build_summary_md_per_policy()
     test_build_summary_md_empty()
+    test_main_end_to_end()
+    test_main_missing_index_writes_nothing()
+    test_main_old_schema_writes_nothing()
     print("OK")
