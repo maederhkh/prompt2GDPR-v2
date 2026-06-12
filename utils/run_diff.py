@@ -110,3 +110,118 @@ def match_clauses(records_a: list, records_b: list) -> dict:
     only_a = [ra for j, ra in enumerate(leftovers_a) if j not in matched_a]
     only_b = [rb for i, rb in enumerate(records_b) if i not in used_b]
     return {"pairs": pairs, "only_a": only_a, "only_b": only_b}
+
+
+SNIPPET_LEN = 60
+
+
+def _snippet(quote) -> str:
+    """First ~60 chars of a quote (whitespace-collapsed), with an ellipsis."""
+    q = " ".join(str(quote).split())
+    return q if len(q) <= SNIPPET_LEN else q[:SNIPPET_LEN] + "…"
+
+
+def build_diff(run_a: dict, run_b: dict, name_a: str, name_b: str) -> dict:
+    """Pure function: two run dicts -> one diff structure (see render_diff_md)."""
+    fin_a = run_a.get("finalizer_output", {}) or {}
+    fin_b = run_b.get("finalizer_output", {}) or {}
+    matched = match_clauses(clause_labels(run_a), clause_labels(run_b))
+    changed = [(ra, rb) for ra, rb in matched["pairs"] if ra["label"] != rb["label"]]
+
+    models_a = run_a.get("agent_models", {}) or {}
+    models_b = run_b.get("agent_models", {}) or {}
+    models = [
+        {
+            "agent": agent,
+            "a": models_a.get(agent, "N/A"),
+            "b": models_b.get(agent, "N/A"),
+            "changed": models_a.get(agent, "N/A") != models_b.get(agent, "N/A"),
+        }
+        for agent in sorted(set(models_a) | set(models_b))
+    ]
+
+    return {
+        "name_a": name_a,
+        "name_b": name_b,
+        "policy_a": run_a.get("policy_name", "N/A"),
+        "policy_b": run_b.get("policy_name", "N/A"),
+        "same_policy": run_a.get("policy_name") == run_b.get("policy_name"),
+        "overall": {"a": fin_a.get("overall_label", "N/A"), "b": fin_b.get("overall_label", "N/A")},
+        "confidence": {"a": fin_a.get("confidence", "N/A"), "b": fin_b.get("confidence", "N/A")},
+        "models": models,
+        "models_changed": [m["agent"] for m in models if m["changed"]],
+        "changed": changed,
+        "unchanged_count": len(matched["pairs"]) - len(changed),
+        "only_a": matched["only_a"],
+        "only_b": matched["only_b"],
+        "clause_counts": (len(run_a.get("verified_clauses", []) or []),
+                          len(run_b.get("verified_clauses", []) or [])),
+    }
+
+
+def _verdict(a, b) -> str:
+    return "same" if a == b else "⚠ changed"
+
+
+def _only_section(title: str, records: list) -> list:
+    """Render one 'Only in <run>' section as markdown lines."""
+    lines = [f"## Only in {title} ({len(records)})"]
+    if records:
+        lines.extend(f'- "{_snippet(r["quote"])}" — {r["label"]}' for r in records)
+    else:
+        lines.append("_None._")
+    return lines
+
+
+def render_diff_md(diff: dict) -> str:
+    """Render the diff structure as the markdown document."""
+    na, nb = diff["name_a"], diff["name_b"]
+    lines = [f"# Run Diff: {na} vs {nb}", ""]
+    if diff["same_policy"]:
+        lines.append(f"Policy: {diff['policy_a']}")
+    else:
+        lines.append(
+            f"⚠ WARNING: these runs are for DIFFERENT policies "
+            f"({diff['policy_a']} vs {diff['policy_b']})"
+        )
+    o, c = diff["overall"], diff["confidence"]
+    lines.append(f"Overall label: {o['a']} → {o['b']} ({_verdict(o['a'], o['b'])})")
+    lines.append(f"Confidence: {c['a']} → {c['b']} ({_verdict(c['a'], c['b'])})")
+    counts = diff["clause_counts"]
+    lines.append(f"Clauses: {counts[0]} vs {counts[1]}")
+    mc = diff["models_changed"]
+    lines.append(
+        "Models: identical" if not mc
+        else f"Models: ⚠ {len(mc)} agent(s) differ ({', '.join(mc)})"
+    )
+    lines.append("")
+
+    lines.append("## Models")
+    if diff["models"]:
+        lines.append(f"| Agent | {na} | {nb} | |")
+        lines.append("|---|---|---|---|")
+        for m in diff["models"]:
+            mark = "⚠ changed" if m["changed"] else "same"
+            lines.append(f"| {m['agent']} | {m['a']} | {m['b']} | {mark} |")
+    else:
+        lines.append("_No model information in either run._")
+    lines.append("")
+
+    lines.append(f"## Label changes ({len(diff['changed'])})")
+    if diff["changed"]:
+        lines.append(f"| Clause (start of quote) | {na} | {nb} |")
+        lines.append("|---|---|---|")
+        for ra, rb in diff["changed"]:
+            lines.append(f'| "{_snippet(ra["quote"])}" | {ra["label"]} | {rb["label"]} |')
+    else:
+        lines.append("_None._")
+    lines.append("")
+
+    lines.extend(_only_section(na, diff["only_a"]))
+    lines.append("")
+    lines.extend(_only_section(nb, diff["only_b"]))
+    lines.append("")
+
+    lines.append("## Unchanged")
+    lines.append(f"{diff['unchanged_count']} clause(s) had the same label in both runs.")
+    return "\n".join(lines) + "\n"
