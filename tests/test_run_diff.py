@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from utils.run_diff import load_run, clause_labels, match_clauses, build_diff, render_diff_md
+from utils.run_diff import load_run, clause_labels, match_clauses, build_diff, render_diff_md, main
 
 
 def _run(policy="policy_x.txt", overall="Compliant", confidence="high",
@@ -189,6 +189,34 @@ def test_render_diff_md_sections():
     assert "DIFFERENT policies" in md2
 
 
+def test_main_end_to_end():
+    d = Path(tempfile.mkdtemp())
+    try:
+        pa = d / "policy_x_run1.json"
+        pb = d / "policy_x_run2.json"
+        pa.write_text(json.dumps(_run()), encoding="utf-8")
+        pb.write_text(json.dumps(_run(overall="Non-Compliant")), encoding="utf-8")
+        rc = main(pa, pb, output_dir=d)
+        assert rc == 0
+        out = (d / "diff_policy_x_run1_vs_policy_x_run2.md").read_text(encoding="utf-8")
+        assert out.startswith("# Run Diff: policy_x_run1 vs policy_x_run2")
+        assert "Overall label: Compliant → Non-Compliant (⚠ changed)" in out
+    finally:
+        shutil.rmtree(d)
+
+
+def test_main_bad_input_writes_nothing():
+    d = Path(tempfile.mkdtemp())
+    try:
+        pa = d / "policy_x_run1.json"
+        pa.write_text(json.dumps(_run()), encoding="utf-8")
+        rc = main(pa, d / "missing.json", output_dir=d)
+        assert rc == 0
+        assert list(d.glob("diff_*.md")) == []
+    finally:
+        shutil.rmtree(d)
+
+
 if __name__ == "__main__":
     test_load_run_valid_and_invalid()
     test_clause_labels_join_and_unassessed()
@@ -198,4 +226,6 @@ if __name__ == "__main__":
     test_build_diff_missing_models_is_na()
     test_build_diff_different_policy()
     test_render_diff_md_sections()
+    test_main_end_to_end()
+    test_main_bad_input_writes_nothing()
     print("OK")

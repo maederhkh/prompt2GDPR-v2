@@ -11,6 +11,7 @@ calls. The pipeline never invokes this — run on demand with:
 """
 
 import json
+import sys
 from pathlib import Path
 
 from rapidfuzz import fuzz
@@ -225,3 +226,33 @@ def render_diff_md(diff: dict) -> str:
     lines.append("## Unchanged")
     lines.append(f"{diff['unchanged_count']} clause(s) had the same label in both runs.")
     return "\n".join(lines) + "\n"
+
+
+def main(path_a, path_b, output_dir="output/results") -> int:
+    """
+    Diff two run JSONs: print the comparison to the terminal and write
+    diff_<a>_vs_<b>.md into output_dir. Returns a process exit code (always
+    0 — bad input is reported, not an error; this tool must never fail a
+    shell pipeline).
+    """
+    # Windows consoles/pipes may not be UTF-8; degrade gracefully instead of
+    # crashing on em dashes/arrows when output is redirected.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
+
+    try:
+        run_a = load_run(path_a)
+        run_b = load_run(path_b)
+    except ValueError as exc:
+        print(f"Cannot diff: {exc}")
+        return 0
+
+    name_a, name_b = Path(path_a).stem, Path(path_b).stem
+    md = render_diff_md(build_diff(run_a, run_b, name_a, name_b))
+    print(md)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / f"diff_{name_a}_vs_{name_b}.md"
+    out_path.write_text(md, encoding="utf-8")
+    print(f"Diff written to {out_path}")
+    return 0
