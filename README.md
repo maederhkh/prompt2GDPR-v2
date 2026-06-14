@@ -108,21 +108,6 @@ All references consulted are logged in the evaluator output under `references_us
 
 ---
 
-## Models
-
-Each agent is assigned a model suited to its role via [OpenRouter](https://openrouter.ai/models). Defaults live in `config.py` (`DEFAULT_AGENT_MODELS`) and can be overridden per run from the CLI.
-
-| Agent | Default model | Why |
-|---|---|---|
-| Scout | `mistralai/mistral-small-24b-instruct-2501` | Cheap, fast section identification |
-| Deep Extractor | `meta-llama/llama-3.3-70b-instruct` | Strong instruction following, high call volume |
-| Evaluator | `openai/gpt-4o-mini` | Reliable structured JSON + legal reasoning |
-| Reflector A / B | `openai/gpt-4o-mini` | Two independent auditors |
-| Blind Labeler A / B | `openai/gpt-4o-mini` | Mirror the reflectors for the anchoring delta |
-| Finalizer | `openai/gpt-4o-mini` | Reliable structured output |
-
----
-
 ## Usage
 
 Set your OpenRouter key in a `.env` file at the project root:
@@ -160,6 +145,26 @@ Each run writes to `output/results/`:
 
 The final compliance label is one of `Compliant` / `Partially Compliant` / `Non-Compliant`, with a confidence level of `high` / `medium` / `low` and always `human_review_recommended: true`.
 
+## Analysis Tools
+
+Two standalone, **on-demand** tools turn the per-run artifacts into research evidence. Both are read-only, make zero LLM calls, and are **never invoked by the pipeline** — run them yourself when you want them. Each prints to the terminal and writes one markdown file you can delete and regenerate anytime.
+
+**Aggregate summary across all runs:**
+
+```bash
+python analyze_runs.py
+```
+
+Reads `output/results/runs_index.csv` and writes `output/results/runs_summary.md` — Overall and Per-policy statistics (volume & coverage, compliance outcomes, and reliability: agreement rate, disputes, anchoring). Answers "across every run so far, how stable are the verdicts?".
+
+**Clause-level diff of two runs:**
+
+```bash
+python diff_runs.py <run_a.json> <run_b.json>
+```
+
+Compares two run JSONs clause by clause and model by model, writing `output/results/diff_<a>_vs_<b>.md`. Because clause IDs are assigned per run, clauses are matched across runs by their verbatim quote text (exact match first, then fuzzy ≥ 90). The diff reports the overall-label / confidence verdicts, a **Models** table (which agent ran which model in each run), **label changes** on matched clauses, clauses **only in one run** (extraction instability), and an unchanged count. If the two runs are for different policies it still produces the diff but prints a loud warning. This is the measuring instrument for run-to-run stability and model-swap experiments.
+
 ### Run metadata & reproducibility
 
 Every result is stamped with provenance so any run can be reproduced and located:
@@ -176,6 +181,8 @@ Every result is stamped with provenance so any run can be reproduced and located
 prompt2gdpr_v2/
 ├── main.py                        # Orchestrator + CLI
 ├── config.py                      # Models, token budgets, feature toggles, temperature
+├── analyze_runs.py                # On-demand: aggregate summary over all runs
+├── diff_runs.py                   # On-demand: clause-level diff of two runs
 ├── agents/
 │   ├── extractor.py               # Agent 1 (Scout Pass 1 + Deep Extractor Pass 2)
 │   ├── evaluator.py               # Agent 2 (tool-calling loop)
@@ -199,6 +206,8 @@ prompt2gdpr_v2/
 │   ├── legal_tools.py             # Legal reference tool definitions + executor
 │   ├── run_metadata.py            # Per-run provenance (run_id, git, policy hash)
 │   ├── runs_index.py              # Cumulative runs index (md + csv)
+│   ├── runs_summary.py            # Aggregate runs summary (analyze_runs.py)
+│   ├── run_diff.py                # Clause-level run comparison (diff_runs.py)
 │   └── report_generator.py        # Markdown report rendering
 ├── evaluation/
 │   └── metrics.py                 # M1–M5 evaluation metrics
