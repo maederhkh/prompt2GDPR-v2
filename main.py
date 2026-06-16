@@ -37,6 +37,7 @@ from utils.label_panel import build_label_panel, annotate_finalizer_with_dispute
 from config import DEFAULT_MODEL, DEFAULT_AGENT_MODELS, OPENROUTER_BASE_URL, ENABLE_BLIND_LABELER, LABELER_TEMPERATURE
 from utils.verifier import verify_clauses
 from utils.report_generator import generate_report
+from utils.policy_loader import load_policy_text, SUPPORTED_EXTENSIONS
 
 MAX_RETRIES = 2
 
@@ -58,7 +59,7 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
         and the evaluation metrics for this run.
     """
     policy_name = policy_path.stem
-    policy_text = policy_path.read_text(encoding="utf-8", errors="replace")
+    policy_text = load_policy_text(policy_path)
 
     print(f"\n{'='*60}")
     print(f"Policy: {policy_name}")
@@ -338,7 +339,7 @@ def main() -> None:
     parser.add_argument(
         "--policy",
         required=True,
-        help="Path to the privacy policy text file (.txt)",
+        help="Path to the privacy policy file (.txt/.md/.html/.htm/.pdf/.docx)",
     )
     parser.add_argument(
         "--runs",
@@ -409,6 +410,14 @@ def main() -> None:
         print(f"ERROR: Policy file not found: {policy_path}", file=sys.stderr)
         sys.exit(1)
 
+    if policy_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+        print(
+            f"ERROR: unsupported policy format '{policy_path.suffix}'; "
+            f"supported: {' '.join(sorted(SUPPORTED_EXTENSIONS))}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         print("ERROR: OPENROUTER_API_KEY environment variable not set.", file=sys.stderr)
@@ -440,9 +449,13 @@ def main() -> None:
             print(f"{'#'*60}")
 
         blind_enabled = ENABLE_BLIND_LABELER and not args.no_blind_labeler
-        result = run_pipeline(
-            client, policy_path, agent_models=agent_models, blind_enabled=blind_enabled
-        )
+        try:
+            result = run_pipeline(
+                client, policy_path, agent_models=agent_models, blind_enabled=blind_enabled
+            )
+        except ValueError as exc:
+            print(f"ERROR: could not read policy: {exc}", file=sys.stderr)
+            sys.exit(1)
         save_result(result, output_dir, run_index=run_i)
         all_results.append(result)
 
