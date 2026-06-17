@@ -6,6 +6,15 @@ The system replaces single-prompt LLM evaluation with a structured multi-agent p
 
 ---
 
+## Knowledge Graph
+
+Explore the codebase as an interactive knowledge graph (424 nodes · 727 edges · 24 communities), generated with graphify from the source:
+
+- **🔗 [Interactive graph](https://maederhkh.github.io/prompt2GDPR-v2/graphify-out/graph.html)** — click nodes to inspect, filter by community (served via GitHub Pages)
+- **📄 [Readable report](graphify-out/GRAPH_REPORT.md)** — community hubs, "god nodes", and architecture overview (renders here on GitHub)
+
+---
+
 ## Background
 
 The original thesis assessed privacy policies against all 7 GDPR Article 5 principles using single-prompt GPT and Grok models. Three critical limitations were identified:
