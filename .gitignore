@@ -16,6 +16,13 @@ venv/
 # Pipeline outputs (can be large and are reproducible)
 output/results/
 
+# Graphify knowledge graph: track the portable artifacts (report/viewer/data/
+# manifest); ignore the regenerable build cache and machine-local state files.
+graphify-out/cache/
+graphify-out/.graphify_root
+graphify-out/.graphify_python
+graphify-out/.graphify_labels.json
+
 # IDE
 .vscode/
 .idea/
