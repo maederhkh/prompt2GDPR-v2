@@ -135,7 +135,7 @@ Common options:
 
 | Flag | Purpose |
 |---|---|
-| `--policy PATH` | Path to the policy `.txt` file (required) |
+| `--policy PATH` | Path to the policy file — `.txt`, `.md`, `.html`/`.htm`, `.pdf`, or `.docx` (required) |
 | `--runs N` | Run the pipeline N times for label-stability measurement (default: 1) |
 | `--model SLUG` | Global model for all agents (overridden per-agent below) |
 | `--model-scout` / `--model-extractor` / `--model-evaluator` / `--model-reflector-a` / `--model-reflector-b` / `--model-finalizer` | Per-agent model overrides |
