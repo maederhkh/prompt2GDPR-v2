@@ -221,7 +221,7 @@ prompt2gdpr_v2/
 ├── evaluation/
 │   └── metrics.py                 # M1–M5 evaluation metrics
 ├── data/
-│   ├── policies/                  # Input policy text files (.txt)
+│   ├── policies/                  # Input policy files (.txt/.md/.html/.pdf/.docx)
 │   └── legal_refs/
 │       ├── primary/               # GDPR articles and recitals
 │       └── secondary/             # WP29/EDPB opinion excerpts
