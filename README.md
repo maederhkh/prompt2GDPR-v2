@@ -30,8 +30,8 @@ This project addresses all three by scoping to Article 5(1)(b) and introducing a
 ## Pipeline Architecture
 
 ```
-Policy Text (.txt)
-      │
+Policy file (.txt / .md / .html / .htm / .pdf / .docx)
+      │  Loaded and converted to clean plain text by the input loader
       ▼
 [Agent 1 · Pass 1: Scout]
       │  Reads the full policy and maps which sections are likely to contain
