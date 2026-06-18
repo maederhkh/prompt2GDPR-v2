@@ -131,6 +131,8 @@ Run the pipeline on a policy:
 python main.py --policy data/policies/policy_short.txt
 ```
 
+The policy may be plain text (`.txt`/`.md`), HTML (`.html`/`.htm`), PDF (`.pdf`), or Word (`.docx`) — the input loader converts each to clean plain text before the pipeline runs, so the same command works on any of them. (Scanned/image-only PDFs are not supported; OCR is out of scope.)
+
 Common options:
 
 | Flag | Purpose |
