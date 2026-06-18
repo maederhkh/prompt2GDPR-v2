@@ -30,8 +30,8 @@ This project addresses all three by scoping to Article 5(1)(b) and introducing a
 ## Pipeline Architecture
 
 ```
-Policy Text (.txt)
-      │
+Policy file (.txt / .md / .html / .htm / .pdf / .docx)
+      │  Loaded and converted to clean plain text by the input loader
       ▼
 [Agent 1 · Pass 1: Scout]
       │  Reads the full policy and maps which sections are likely to contain
@@ -131,11 +131,13 @@ Run the pipeline on a policy:
 python main.py --policy data/policies/policy_short.txt
 ```
 
+The policy may be plain text (`.txt`/`.md`), HTML (`.html`/`.htm`), PDF (`.pdf`), or Word (`.docx`) — the input loader converts each to clean plain text before the pipeline runs, so the same command works on any of them. (Scanned/image-only PDFs are not supported; OCR is out of scope.)
+
 Common options:
 
 | Flag | Purpose |
 |---|---|
-| `--policy PATH` | Path to the policy `.txt` file (required) |
+| `--policy PATH` | Path to the policy file — `.txt`, `.md`, `.html`/`.htm`, `.pdf`, or `.docx` (required) |
 | `--runs N` | Run the pipeline N times for label-stability measurement (default: 1) |
 | `--model SLUG` | Global model for all agents (overridden per-agent below) |
 | `--model-scout` / `--model-extractor` / `--model-evaluator` / `--model-reflector-a` / `--model-reflector-b` / `--model-finalizer` | Per-agent model overrides |
@@ -221,7 +223,7 @@ prompt2gdpr_v2/
 ├── evaluation/
 │   └── metrics.py                 # M1–M5 evaluation metrics
 ├── data/
-│   ├── policies/                  # Input policy text files (.txt)
+│   ├── policies/                  # Input policy files (.txt/.md/.html/.pdf/.docx)
 │   └── legal_refs/
 │       ├── primary/               # GDPR articles and recitals
 │       └── secondary/             # WP29/EDPB opinion excerpts
