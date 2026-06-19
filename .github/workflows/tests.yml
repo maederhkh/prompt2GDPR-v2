@@ -1,0 +1,38 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        # Mirrors [project].dependencies in pyproject.toml. The project is not
+        # installed as a package (no [build-system], flat layout); the test
+        # suites add the repo root to sys.path themselves. If a dependency is
+        # added to pyproject.toml, add it here too — otherwise CI fails with an
+        # ImportError, which is the intended self-correcting signal.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install beautifulsoup4 json-repair openai pydantic pypdf python-docx python-dotenv rapidfuzz
+
+      - name: Run offline test suites
+        # Auto-discovers every tests/test_*.py; set -e makes the first failing
+        # suite fail the whole job.
+        run: |
+          set -e
+          for f in tests/test_*.py; do
+            echo "=== $f ==="
+            python "$f"
+          done
