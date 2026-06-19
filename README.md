@@ -1,5 +1,7 @@
 # prompt2GDPR-v2
 
+![Tests](https://github.com/maederhkh/prompt2GDPR-v2/actions/workflows/tests.yml/badge.svg)
+
 An agentic workflow for assessing privacy policy compliance with **GDPR Article 5(1)(b)  Purpose Limitation**, built as a research extension of a master's thesis at the University of Bologna (2025/2026).
 
 The system replaces single-prompt LLM evaluation with a structured multi-agent pipeline that is more evidence-grounded, more stable, and more explainable than the thesis baseline. Beyond producing a label, it **measures its own reliability**: independent dual auditing, a blind-labeling tier that quantifies anchoring bias, and full per-run provenance.
