@@ -149,8 +149,9 @@ Common options:
 
 | Flag | Purpose |
 |---|---|
-| `--policy PATH` | Path to the policy file — `.txt`, `.md`, `.html`/`.htm`, `.pdf`, or `.docx` (required) |
-| `--runs N` | Run the pipeline N times for label-stability measurement (default: 1) |
+| `--policy PATH` | Path to a single policy file — `.txt`, `.md`, `.html`/`.htm`, `.pdf`, or `.docx`. Exactly one of `--policy` / `--policy-dir` is required |
+| `--policy-dir DIR` | Batch (corpus) mode: run every supported policy in a folder, then write a batch comparison table. Mutually exclusive with `--policy` |
+| `--runs N` | Run the pipeline N times for label-stability measurement (default: 1; applies per policy in batch mode) |
 | `--model SLUG` | Global model for all agents (overridden per-agent below) |
 | `--model-scout` / `--model-extractor` / `--model-evaluator` / `--model-reflector-a` / `--model-reflector-b` / `--model-finalizer` | Per-agent model overrides |
 | `--no-blind-labeler` | Skip the Blind Labeler tier (2 fewer LLM calls; no anchoring delta) |
@@ -165,6 +166,10 @@ Each run writes to `output/results/`:
 - **`<policy>_<run_id>.json`** — the full result: all agent outputs (scout, extractor, evaluator, both reflectors, blind labelers, finalizer), verified/flagged clauses, the label panel, legal references consulted, inter-reflector agreement, anchoring shift rates, M1–M5 evaluation metrics, and run metadata.
 - **`<policy>_<run_id>_report.md`**  a human-readable report, including a Run Metadata block for provenance.
 - **`runs_index.md` / `runs_index.csv`**  a cumulative index with **one summary row per run** (run ID, policy, commit, overall label, confidence, clause count, agreement rate, retries, disputed count, blind on/off, anchoring shift A/B). The `.md` is for a quick glance; the `.csv` opens directly in Excel/pandas.
+
+In **batch mode** (`--policy-dir`), every policy still produces its own JSON, report, and `runs_index` row exactly as above; additionally one **batch-scoped comparison** is written:
+
+- **`comparison_<id>.md` / `comparison_<id>.csv`**  a side-by-side survey of just *this* batch: one row per policy-run (policy, run, status, overall label, confidence, clauses, disputed, retries, agreement). Every cell is drawn from that run's index row — no new extraction. `<id>` is the run ID of the first policy in the batch. The `.md` is for a quick read; the `.csv` opens in Excel/pandas. One policy failing is recorded as a `failed` row and never aborts the batch.
 
 The final compliance label is one of `Compliant` / `Partially Compliant` / `Non-Compliant`, with a confidence level of `high` / `medium` / `low` and always `human_review_recommended: true`.
 
