@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -31,13 +32,14 @@ from agents.reflector import run_reflector, errors_for_agent, build_retry_instru
 from utils.reflector_merge import merge_reflector_outputs
 from agents.finalizer import run_finalizer
 from utils.run_metadata import build_run_metadata
-from utils.runs_index import append_run_to_index
+from utils.runs_index import append_run_to_index, build_index_row
 from agents.blind_labeler import run_blind_labeler
 from utils.label_panel import build_label_panel, annotate_finalizer_with_disputes
 from config import DEFAULT_MODEL, DEFAULT_AGENT_MODELS, OPENROUTER_BASE_URL, ENABLE_BLIND_LABELER, LABELER_TEMPERATURE
 from utils.verifier import verify_clauses
 from utils.report_generator import generate_report
-from utils.policy_loader import load_policy_text, SUPPORTED_EXTENSIONS
+from utils.policy_loader import load_policy_text, SUPPORTED_EXTENSIONS, discover_policy_files
+from utils.batch_comparison import build_comparison_md, build_comparison_csv_rows
 
 MAX_RETRIES = 2
 
@@ -330,16 +332,44 @@ def _empty_result(policy_name: str, extractor_output: dict, flagged_clauses: lis
     }
 
 
+def _write_batch_comparison(entries: list, output_dir: Path) -> None:
+    """Write comparison_<batch_label>.md and .csv for one batch run.
+
+    batch_label is the run_id of the first entry that has a row (ok or empty);
+    "failed" if every policy failed. Never fatal — the per-policy JSON/report
+    and the cumulative runs index remain the source of truth.
+    """
+    try:
+        batch_label = next(
+            (e["row"]["run_id"] for e in entries if e.get("row")), "failed"
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
+        md_path = output_dir / f"comparison_{batch_label}.md"
+        csv_path = output_dir / f"comparison_{batch_label}.csv"
+        md_path.write_text(build_comparison_md(entries, batch_label), encoding="utf-8")
+        with csv_path.open("w", newline="", encoding="utf-8") as f:
+            csv.writer(f).writerows(build_comparison_csv_rows(entries))
+        print(f"\nBatch comparison (md):  {md_path}")
+        print(f"Batch comparison (csv): {csv_path}")
+    except Exception as exc:  # comparison is a convenience aggregate; never fatal
+        print(f"  [batch] WARNING: could not write comparison: {exc}")
+
+
 def main() -> None:
     load_dotenv()
 
     parser = argparse.ArgumentParser(
         description="GDPR Article 5(1)(b) Purpose Limitation Compliance Workflow"
     )
-    parser.add_argument(
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument(
         "--policy",
-        required=True,
-        help="Path to the privacy policy file (.txt/.md/.html/.htm/.pdf/.docx)",
+        help="Path to a single privacy policy file (.txt/.md/.html/.htm/.pdf/.docx).",
+    )
+    source.add_argument(
+        "--policy-dir",
+        help="Path to a folder; runs every supported policy file inside it "
+             "(batch/corpus mode). Mutually exclusive with --policy.",
     )
     parser.add_argument(
         "--runs",
@@ -405,18 +435,35 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    policy_path = Path(args.policy)
-    if not policy_path.exists():
-        print(f"ERROR: Policy file not found: {policy_path}", file=sys.stderr)
-        sys.exit(1)
-
-    if policy_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
-        print(
-            f"ERROR: unsupported policy format '{policy_path.suffix}'; "
-            f"supported: {' '.join(sorted(SUPPORTED_EXTENSIONS))}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    if args.policy_dir:
+        batch_mode = True
+        policy_dir = Path(args.policy_dir)
+        if not policy_dir.is_dir():
+            print(f"ERROR: policy directory not found: {policy_dir}", file=sys.stderr)
+            sys.exit(1)
+        policy_files = discover_policy_files(policy_dir)
+        if not policy_files:
+            print(
+                f"ERROR: no supported policy files "
+                f"({' '.join(sorted(SUPPORTED_EXTENSIONS))}) found in {policy_dir}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        print(f"Batch mode: {len(policy_files)} policy file(s) in {policy_dir}")
+    else:
+        batch_mode = False
+        policy_path = Path(args.policy)
+        if not policy_path.exists():
+            print(f"ERROR: Policy file not found: {policy_path}", file=sys.stderr)
+            sys.exit(1)
+        if policy_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            print(
+                f"ERROR: unsupported policy format '{policy_path.suffix}'; "
+                f"supported: {' '.join(sorted(SUPPORTED_EXTENSIONS))}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        policy_files = [policy_path]
 
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
@@ -441,23 +488,49 @@ def main() -> None:
         "blind_b":     _resolve("blind_b",     None),
     }
 
-    all_results = []
-    for run_i in range(1, args.runs + 1):
-        if args.runs > 1:
+    blind_enabled = ENABLE_BLIND_LABELER and not args.no_blind_labeler
+    entries = []
+    for policy_path in policy_files:
+        if batch_mode:
             print(f"\n{'#'*60}")
-            print(f"# Run {run_i} of {args.runs}")
+            print(f"# Policy: {policy_path.name}")
             print(f"{'#'*60}")
+        for run_i in range(1, args.runs + 1):
+            if args.runs > 1:
+                # Preserve the original single-mode run banner verbatim.
+                print(f"\n{'#'*60}")
+                print(f"# Run {run_i} of {args.runs}")
+                print(f"{'#'*60}")
+            try:
+                result = run_pipeline(
+                    client, policy_path,
+                    agent_models=agent_models, blind_enabled=blind_enabled,
+                )
+            except Exception as exc:
+                # Single mode preserves prior behavior: report and exit non-zero.
+                if not batch_mode:
+                    print(f"ERROR: could not read policy: {exc}", file=sys.stderr)
+                    sys.exit(1)
+                # Batch mode: record the failure and keep going with the rest.
+                print(f"  [batch] ERROR: {policy_path.name} failed: {exc} — continuing.",
+                      file=sys.stderr)
+                entries.append({
+                    "policy": policy_path.stem, "run_index": run_i,
+                    "status": "failed", "row": None, "error": str(exc),
+                })
+                continue
 
-        blind_enabled = ENABLE_BLIND_LABELER and not args.no_blind_labeler
-        try:
-            result = run_pipeline(
-                client, policy_path, agent_models=agent_models, blind_enabled=blind_enabled
-            )
-        except ValueError as exc:
-            print(f"ERROR: could not read policy: {exc}", file=sys.stderr)
-            sys.exit(1)
-        save_result(result, output_dir, run_index=run_i)
-        all_results.append(result)
+            save_result(result, output_dir, run_index=run_i)
+            entries.append({
+                "policy": policy_path.stem,
+                "run_index": run_i,
+                "status": "empty" if result.get("error") else "ok",
+                "row": build_index_row(result),
+                "error": result.get("error"),
+            })
+
+    if batch_mode:
+        _write_batch_comparison(entries, output_dir)
 
 
 
