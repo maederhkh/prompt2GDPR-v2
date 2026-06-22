@@ -121,10 +121,6 @@ All references consulted are logged in the evaluator output under `references_us
 
 ## Usage
 
-Set your OpenRouter key in a `.env` file at the project root:
-
-```
-OPENROUTER_API_KEY=sk-or-...
 ```
 
 Run the pipeline on a policy:
