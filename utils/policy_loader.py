@@ -66,6 +66,24 @@ def _load_docx(path: Path) -> str:
     return "\n".join(p.text for p in doc.paragraphs)
 
 
+def discover_policy_files(directory) -> list:
+    """
+    Return the supported policy files directly inside `directory`
+    (non-recursive), sorted by filename case-insensitively. Files whose
+    extension is not in SUPPORTED_EXTENSIONS are skipped. Returns [] when none
+    match; does not raise for an empty result — the caller decides what to do.
+
+    Raises (via Path.iterdir) if `directory` does not exist; callers validate
+    the directory exists before calling.
+    """
+    d = Path(directory)
+    files = [
+        p for p in d.iterdir()
+        if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
+    ]
+    return sorted(files, key=lambda p: p.name.lower())
+
+
 def load_policy_text(path) -> str:
     """
     Read one policy file and return clean plain text. Dispatches on the

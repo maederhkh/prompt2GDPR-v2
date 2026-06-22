@@ -135,6 +135,16 @@ python main.py --policy data/policies/policy_short.txt
 
 The policy may be plain text (`.txt`/`.md`), HTML (`.html`/`.htm`), PDF (`.pdf`), or Word (`.docx`) — the input loader converts each to clean plain text before the pipeline runs, so the same command works on any of them. (Scanned/image-only PDFs are not supported; OCR is out of scope.)
 
+Run a whole folder of policies and get a side-by-side comparison:
+
+```bash
+python main.py --policy-dir data/policies/
+```
+
+This runs every supported policy in the folder (each still gets its own JSON and
+report) and writes a batch comparison table to
+`output/results/comparison_<id>.md` (and `.csv`).
+
 Common options:
 
 | Flag | Purpose |
