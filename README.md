@@ -36,8 +36,10 @@ Policy file (.txt / .md / .html / .htm / .pdf / .docx)
       │  Loaded and converted to clean plain text by the input loader
       ▼
 [Agent 1 · Pass 1: Scout]
-      │  Reads the full policy and maps which sections are likely to contain
-      │  purpose-limitation content (no extraction, no assessment)
+      │  Reads the full policy and classifies each section as include /
+      │  maybe_include / exclude — each decision carries a reason, the
+      │  matched signals, and a confidence level (auditable scout_report;
+      │  no extraction, no assessment)
       ▼
 [Agent 1 · Pass 2: Deep Extractor]
       │  Extracts verbatim clauses from each scouted section
@@ -82,7 +84,7 @@ Outputs → output/results/
 
 | Agent | Role | Tools |
 |---|---|---|
-| **Scout** (Agent 1, Pass 1) | Maps which policy sections likely contain purpose-limitation content | None |
+| **Scout** (Agent 1, Pass 1) | Classifies each section as `include` / `maybe_include` / `exclude` for purpose-limitation content — recording a reason, matched signals, and confidence per decision (saved as an auditable `scout_report`) | None |
 | **Deep Extractor** (Agent 1, Pass 2) | Extracts verbatim clauses from each scouted section | None |
 | **Evaluator** (Agent 2) | Applies the two-stage GDPR rubric per clause | `get_legal_reference` |
 | **Reflector A & B** (Agent 3) | Independent parallel audit of Agents 1 & 2; drives the retry loop | None |
@@ -159,7 +161,7 @@ Common options:
 
 Each run writes to `output/results/`:
 
-- **`<policy>_<run_id>.json`** — the full result: all agent outputs (scout, extractor, evaluator, both reflectors, blind labelers, finalizer), verified/flagged clauses, the label panel, legal references consulted, inter-reflector agreement, anchoring shift rates, M1–M5 evaluation metrics, and run metadata.
+- **`<policy>_<run_id>.json`** — the full result: all agent outputs (scout, extractor, evaluator, both reflectors, blind labelers, finalizer), the auditable `scout_report` (per-section `include` / `maybe_include` / `exclude` decisions with reason, signals, and confidence), verified/flagged clauses, the label panel, legal references consulted, inter-reflector agreement, anchoring shift rates, M1–M5 evaluation metrics, and run metadata.
 - **`<policy>_<run_id>_report.md`**  a human-readable report, including a Run Metadata block for provenance.
 - **`runs_index.md` / `runs_index.csv`**  a cumulative index with **one summary row per run** (run ID, policy, commit, overall label, confidence, clause count, agreement rate, retries, disputed count, blind on/off, anchoring shift A/B). The `.md` is for a quick glance; the `.csv` opens directly in Excel/pandas.
 
