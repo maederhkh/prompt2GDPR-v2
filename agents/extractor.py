@@ -70,7 +70,7 @@ def run_extractor(
     # ------------------------------------------------------------------
     # Pass 1: Section Scout
     # ------------------------------------------------------------------
-    scout_sections = _run_scout(client, policy_text, _scout_model)
+    scout_sections, scout_report = _run_scout(client, policy_text, _scout_model)
 
     if not scout_sections:
         # Scout returned nothing — fall back to single-pass
@@ -139,6 +139,7 @@ def run_extractor(
         "coverage_complete": True,
         "extraction_mode": "two_pass",
         "sections_processed": [s["name"] for s in sections],
+        "scout_report": scout_report,
         "self_check_report": self_check_report,
     }
 
@@ -155,10 +156,107 @@ def run_extractor(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _run_scout(client: OpenAI, policy_text: str, model: str) -> list[str]:
+SCOUT_REPORT_SCHEMA_VERSION = "section_decisions_v1"
+_VALID_SCOUT_CONFIDENCE = {"high", "medium", "low"}
+
+
+def _empty_scout_report() -> dict:
+    return {
+        "schema_version": SCOUT_REPORT_SCHEMA_VERSION,
+        "include": [],
+        "maybe_include": [],
+        "exclude": [],
+    }
+
+
+def _normalize_scout_decision(item, default_reason: str) -> dict | None:
+    if isinstance(item, str):
+        heading = item.strip()
+        if not heading:
+            return None
+        return {
+            "heading": heading,
+            "reason": default_reason,
+            "signals": [],
+            "confidence": "medium",
+        }
+
+    if not isinstance(item, dict):
+        return None
+
+    heading = str(item.get("heading", "")).strip()
+    if not heading:
+        return None
+
+    signals = item.get("signals", [])
+    if not isinstance(signals, list):
+        signals = []
+
+    confidence = str(item.get("confidence", "medium")).lower()
+    if confidence not in _VALID_SCOUT_CONFIDENCE:
+        confidence = "medium"
+
+    return {
+        "heading": heading,
+        "reason": str(item.get("reason") or default_reason),
+        "signals": [str(signal) for signal in signals if signal],
+        "confidence": confidence,
+    }
+
+
+def _normalize_scout_response(data) -> tuple[list[str], dict]:
+    report = _empty_scout_report()
+
+    if not isinstance(data, dict):
+        return [], report
+
+    if "relevant_sections" in data:
+        raw_include = data.get("relevant_sections", [])
+        if not isinstance(raw_include, list):
+            raw_include = []
+        report["include"] = [
+            decision for decision in (
+                _normalize_scout_decision(
+                    item,
+                    "Legacy scout response marked this section as relevant.",
+                )
+                for item in raw_include
+            )
+            if decision
+        ]
+    else:
+        for bucket in ("include", "maybe_include", "exclude"):
+            raw_items = data.get(bucket, [])
+            if not isinstance(raw_items, list):
+                raw_items = []
+            report[bucket] = [
+                decision for decision in (
+                    _normalize_scout_decision(
+                        item,
+                        f"Scout returned this section in {bucket}.",
+                    )
+                    for item in raw_items
+                )
+                if decision
+            ]
+
+    selected_headings = []
+    seen = set()
+    for decision in report["include"] + report["maybe_include"]:
+        heading = decision["heading"]
+        key = heading.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        selected_headings.append(heading)
+
+    return selected_headings, report
+
+
+def _run_scout(client: OpenAI, policy_text: str, model: str) -> tuple[list[str], dict]:
     """
     Pass 1: ask the model which sections are relevant to purpose limitation.
-    Returns a list of section heading strings, or [] on failure.
+    Returns selected section heading strings plus a normalized scout report.
     """
     try:
         response = client.chat.completions.create(
@@ -171,12 +269,10 @@ def _run_scout(client: OpenAI, policy_text: str, model: str) -> list[str]:
         )
         raw = response.choices[0].message.content or ""
         data = parse_and_repair(raw)
-        sections = data.get("relevant_sections", [])
-        if isinstance(sections, list):
-            return [str(s) for s in sections if s]
+        return _normalize_scout_response(data)
     except Exception as e:
         print(f"    [Scout] Warning: scout call failed ({e}). Will fall back to single-pass.")
-    return []
+    return [], _empty_scout_report()
 
 
 def _extract_from_section(

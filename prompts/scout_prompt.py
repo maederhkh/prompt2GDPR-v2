@@ -1,22 +1,22 @@
 """
 Prompt for Pass 1 of two-pass extraction: Section Scout.
 
-The Scout reads the full policy and returns a list of section headings
-that are likely to contain purpose limitation content. It does NOT extract
-or assess anything — it only identifies which sections to examine.
+The Scout reads the full policy and returns auditable section decisions
+for content likely to contain purpose limitation material. It does NOT
+extract or assess anything; it only identifies which sections to examine.
 """
 
 SCOUT_SYSTEM = """\
 You are a document analyst specialising in GDPR privacy policies. \
 Your only task is to identify which sections of a policy contain content \
-relevant to GDPR Article 5(1)(b) — purpose limitation. \
+relevant to GDPR Article 5(1)(b) - purpose limitation. \
 You are NOT assessing compliance. You are not extracting text. \
 You are only producing a map of relevant sections so that a deeper \
 extraction step can examine each one in full."""
 
 SCOUT_USER_TEMPLATE = """\
-Read the privacy policy below. Identify every section that is likely to contain \
-content relevant to GDPR Article 5(1)(b) — purpose limitation.
+Read the privacy policy below. Classify policy sections by whether they are \
+likely to contain content relevant to GDPR Article 5(1)(b) - purpose limitation.
 
 Include a section if it contains ANY of the following:
 - Statements of what personal data is used for (processing purposes)
@@ -28,15 +28,55 @@ Include a section if it contains ANY of the following:
 - Use of data for legal claims, compliance, or regulatory obligations
 - Consent-based processing with stated purposes
 
-When in doubt, include the section. It is better to examine too many sections \
-than to miss one.
+Use "include" for sections that clearly contain purpose-limitation content. \
+Use "maybe_include" for borderline sections that may contain relevant purpose, \
+legal basis, sharing, analytics, research, consent, or compliance language. \
+When in doubt, choose "maybe_include" rather than "exclude". It is better for \
+the extractor to examine too many sections than to miss one.
 
-Return ONLY valid JSON with a single field "relevant_sections" — \
-a list of section headings exactly as they appear in the policy text. \
-If a section has no heading, describe it briefly (e.g. "opening paragraph").
+Use "exclude" for sections that appear administrative only, such as contact \
+details, version history, navigation text, or content with no processing \
+purpose signal.
+
+Return ONLY valid JSON with exactly these fields:
+- "include": section decision objects
+- "maybe_include": section decision objects
+- "exclude": section decision objects
+
+Each section decision object must contain:
+- "heading": the section heading exactly as it appears in the policy text; if \
+  a section has no heading, describe it briefly, e.g. "opening paragraph"
+- "reason": a short explanation for the classification
+- "signals": a short list of matched purpose-limitation signals
+- "confidence": "high", "medium", or "low"
 
 Example:
-{{"relevant_sections": ["3.1 When you access our Services", "3.8 Statistical purposes", "4. Sharing your data"]}}
+{{
+  "include": [
+    {{
+      "heading": "3.1 When you access our Services",
+      "reason": "Describes purposes for processing service usage data.",
+      "signals": ["processing purposes"],
+      "confidence": "high"
+    }}
+  ],
+  "maybe_include": [
+    {{
+      "heading": "3.8 Statistical purposes",
+      "reason": "May describe statistical or analytics purposes.",
+      "signals": ["statistical purposes", "analytics"],
+      "confidence": "medium"
+    }}
+  ],
+  "exclude": [
+    {{
+      "heading": "12. Contact us",
+      "reason": "Administrative contact information only.",
+      "signals": [],
+      "confidence": "medium"
+    }}
+  ]
+}}
 
 ---
 
