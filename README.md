@@ -123,8 +123,6 @@ All references consulted are logged in the evaluator output under `references_us
 
 ## Usage
 
-```
-
 Run the pipeline on a policy:
 
 ```bash
