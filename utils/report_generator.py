@@ -8,6 +8,51 @@ summarising the compliance assessment in a readable format.
 from pathlib import Path
 
 
+def _render_scout_section(scout_report) -> list:
+    """
+    Render the Section Scout subsection from a scout_report dict.
+
+    Returns a list of markdown lines, or [] when there is nothing to show
+    (scout_report is None/empty, or all three buckets are empty). Pure: writes
+    nothing and does not mutate the input.
+
+    scout_report shape:
+        {"include": [decision, ...], "maybe_include": [...], "exclude": [...]}
+    decision shape:
+        {"heading": str, "reason": str, "signals": list, "confidence": str}
+    """
+    if not scout_report:
+        return []
+
+    include = scout_report.get("include") or []
+    maybe = scout_report.get("maybe_include") or []
+    exclude = scout_report.get("exclude") or []
+    if not (include or maybe or exclude):
+        return []
+
+    def _cell(value) -> str:
+        # Sanitize a free-text cell so it can't break the markdown table.
+        return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+    lines = [
+        "### Section Scout",
+        "",
+        f"- Scout decisions: **{len(include)}** included, "
+        f"**{len(maybe)}** maybe-include, **{len(exclude)}** excluded",
+        "",
+        "| Section | Decision | Confidence | Reason |",
+        "|---|---|---|---|",
+    ]
+    for label, bucket in (("include", include), ("maybe", maybe), ("exclude", exclude)):
+        for decision in bucket:
+            heading = _cell(decision.get("heading", ""))
+            confidence = _cell(decision.get("confidence", ""))
+            reason = _cell(decision.get("reason", ""))
+            lines.append(f"| {heading} | {label} | {confidence} | {reason} |")
+    lines.append("")
+    return lines
+
+
 def generate_report(result: dict, out_path: Path) -> None:
     """
     Generate a human-readable markdown report from a pipeline result dict
@@ -84,6 +129,8 @@ def generate_report(result: dict, out_path: Path) -> None:
     if extractor.get("extraction_notes"):
         lines.append(f"- Extractor notes: {extractor['extraction_notes']}")
     lines.append(f"")
+
+    lines.extend(_render_scout_section(extractor.get("scout_report")))
 
     # -----------------------------------------------------------------------
     # Per-clause assessment table
