@@ -53,6 +53,57 @@ def _render_scout_section(scout_report) -> list:
     return lines
 
 
+def _render_trace_section(run_trace) -> list:
+    """
+    Render the Execution Timeline section from a run_trace event list.
+
+    Returns a list of markdown lines, or [] when there is nothing to show
+    (run_trace is None/empty). Pure: writes nothing and does not mutate input.
+
+    Each event: {"step": int, "stage": str, "model": str|None,
+                 "duration_s": float, "status": str, "note": str}
+    """
+    if not run_trace:
+        return []
+
+    def _cell(value) -> str:
+        # Sanitize a free-text cell so it can't break the markdown table.
+        return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+    total_steps = len(run_trace)
+    total_duration = sum((e.get("duration_s") or 0) for e in run_trace)
+
+    non_ok_counts = {}
+    for e in run_trace:
+        status = e.get("status", "ok")
+        if status != "ok":
+            non_ok_counts[status] = non_ok_counts.get(status, 0) + 1
+    non_ok = ", ".join(f"{n} {s}" for s, n in non_ok_counts.items())
+
+    summary = f"- {total_steps} steps, **{total_duration:.3f}s** total"
+    if non_ok:
+        summary += f" — {non_ok}"
+
+    lines = [
+        "## Execution Timeline",
+        "",
+        summary,
+        "",
+        "| # | Stage | Model | Duration (s) | Status | Note |",
+        "|---|---|---|---|---|---|",
+    ]
+    for e in run_trace:
+        model = e.get("model")
+        model_cell = _cell(model) if model else "—"
+        lines.append(
+            f"| {e.get('step', '?')} | {_cell(e.get('stage', ''))} | {model_cell} "
+            f"| {e.get('duration_s', 0):.3f} | {_cell(e.get('status', ''))} "
+            f"| {_cell(e.get('note', ''))} |"
+        )
+    lines.append("")
+    return lines
+
+
 def generate_report(result: dict, out_path: Path) -> None:
     """
     Generate a human-readable markdown report from a pipeline result dict
@@ -417,6 +468,8 @@ def generate_report(result: dict, out_path: Path) -> None:
             lines.append(f"")
             lines.append(f"_Blind labeling disabled for this run — anchoring not measured._")
         lines.append(f"")
+
+    lines.extend(_render_trace_section(result.get("run_trace")))
 
     # -----------------------------------------------------------------------
     # Write file
