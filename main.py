@@ -38,6 +38,7 @@ from utils.label_panel import build_label_panel, annotate_finalizer_with_dispute
 from config import DEFAULT_MODEL, DEFAULT_AGENT_MODELS, OPENROUTER_BASE_URL, ENABLE_BLIND_LABELER, LABELER_TEMPERATURE
 from utils.verifier import verify_clauses
 from utils.report_generator import generate_report
+from utils.run_trace import RunTrace
 from utils.policy_loader import load_policy_text, SUPPORTED_EXTENSIONS, discover_policy_files
 from utils.batch_comparison import build_comparison_md, build_comparison_csv_rows
 
@@ -62,6 +63,7 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
     """
     policy_name = policy_path.stem
     policy_text = load_policy_text(policy_path)
+    trace = RunTrace()
 
     print(f"\n{'='*60}")
     print(f"Policy: {policy_name}")
@@ -73,11 +75,14 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
     # Step 1: Extractor (Agent 1)
     # ------------------------------------------------------------------
     print("\n[Agent 1] Extractor — identifying purpose limitation clauses...")
-    extractor_output = run_extractor(
-        client, policy_name, policy_text,
-        model=agent_models["extractor"],
-        scout_model=agent_models["scout"],
-    )
+    with trace.step("extractor", model=agent_models["extractor"]):
+        extractor_output = run_extractor(
+            client, policy_name, policy_text,
+            model=agent_models["extractor"],
+            scout_model=agent_models["scout"],
+        )
+    if "scout_report" not in extractor_output:
+        trace.mark_last(status="fallback", note="single-pass fallback (no Scout)")
     clause_count = len(extractor_output.get("extracted_clauses", []))
     print(f"  Extracted {clause_count} clause(s).")
 
@@ -85,10 +90,11 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
     # Step 2: String-Match Verifier
     # ------------------------------------------------------------------
     print("\n[Verifier] Checking clause quotes against policy text...")
-    verified_clauses, flagged_clauses = verify_clauses(
-        extractor_output.get("extracted_clauses", []),
-        policy_text,
-    )
+    with trace.step("verifier"):
+        verified_clauses, flagged_clauses = verify_clauses(
+            extractor_output.get("extracted_clauses", []),
+            policy_text,
+        )
     print(f"  Verified: {len(verified_clauses)}  |  Flagged: {len(flagged_clauses)}")
 
     # Build run provenance once, now that the verified clause count is known.
@@ -106,13 +112,14 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
 
     if not verified_clauses:
         print("  WARNING: No verified clauses. Pipeline cannot continue with evaluation.")
-        return _empty_result(policy_name, extractor_output, flagged_clauses, run_metadata)
+        return _empty_result(policy_name, extractor_output, flagged_clauses, run_metadata, trace.events)
 
     # ------------------------------------------------------------------
     # Step 3: Evaluator (Agent 2) — with retry support
     # ------------------------------------------------------------------
     print("\n[Agent 2] Evaluator — assessing clauses against purpose limitation rubric...")
-    evaluator_output = run_evaluator(client, verified_clauses, model=agent_models["evaluator"])
+    with trace.step("evaluator", model=agent_models["evaluator"]):
+        evaluator_output = run_evaluator(client, verified_clauses, model=agent_models["evaluator"])
     print(f"  Evaluated {len(evaluator_output.get('evaluations', []))} clause(s).")
     print(f"  Overall label: {evaluator_output.get('overall_label', 'N/A')}")
 
@@ -120,22 +127,25 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
     # Step 4: Dual Reflectors (Agents 3A & 3B) — parallel independent audit
     # ------------------------------------------------------------------
     print("\n[Agent 3A] Reflector A — independent audit of Agents 1 & 2...")
-    reflector_a_initial = run_reflector(
-        client, verified_clauses, flagged_clauses, evaluator_output,
-        model=agent_models["reflector_a"]
-    )
+    with trace.step("reflector_a", model=agent_models["reflector_a"]):
+        reflector_a_initial = run_reflector(
+            client, verified_clauses, flagged_clauses, evaluator_output,
+            model=agent_models["reflector_a"]
+        )
     print(f"  Reflector A status: {reflector_a_initial.get('review_status')}  "
           f"| Errors: {len(reflector_a_initial.get('errors', []))}")
 
     print("\n[Agent 3B] Reflector B — independent audit of Agents 1 & 2...")
-    reflector_b_initial = run_reflector(
-        client, verified_clauses, flagged_clauses, evaluator_output,
-        model=agent_models["reflector_b"]
-    )
+    with trace.step("reflector_b", model=agent_models["reflector_b"]):
+        reflector_b_initial = run_reflector(
+            client, verified_clauses, flagged_clauses, evaluator_output,
+            model=agent_models["reflector_b"]
+        )
     print(f"  Reflector B status: {reflector_b_initial.get('review_status')}  "
           f"| Errors: {len(reflector_b_initial.get('errors', []))}")
 
-    initial_reflector_output = merge_reflector_outputs(reflector_a_initial, reflector_b_initial)
+    with trace.step("merge"):
+        initial_reflector_output = merge_reflector_outputs(reflector_a_initial, reflector_b_initial)
     agreement = initial_reflector_output.get("agreement_rate", 1.0)
     print(f"\n  [Merge] Status: {initial_reflector_output['review_status']}  "
           f"| Total unique errors: {len(initial_reflector_output.get('errors', []))}  "
@@ -151,28 +161,31 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
     blind_b_output = None
     if blind_enabled:
         print("\n[Blind Labeler A] Independent (unanchored) labeling...")
-        blind_a_output = run_blind_labeler(
-            client, verified_clauses, model=agent_models["blind_a"]
-        )
+        with trace.step("blind_a", model=agent_models["blind_a"]):
+            blind_a_output = run_blind_labeler(
+                client, verified_clauses, model=agent_models["blind_a"]
+            )
         print(f"  Blind A labeled {len(blind_a_output.get('labels', []))} clause(s).")
 
         print("\n[Blind Labeler B] Independent (unanchored) labeling...")
-        blind_b_output = run_blind_labeler(
-            client, verified_clauses, model=agent_models["blind_b"]
-        )
+        with trace.step("blind_b", model=agent_models["blind_b"]):
+            blind_b_output = run_blind_labeler(
+                client, verified_clauses, model=agent_models["blind_b"]
+            )
         print(f"  Blind B labeled {len(blind_b_output.get('labels', []))} clause(s).")
     else:
         print("\n[Blind Labeler] Disabled for this run.")
 
-    label_panel = build_label_panel(
-        evaluator_output=evaluator_output,
-        reflector_a=reflector_a_initial,
-        reflector_b=reflector_b_initial,
-        blind_a=blind_a_output,
-        blind_b=blind_b_output,
-        models=agent_models,
-        blind_enabled=blind_enabled,
-    )
+    with trace.step("label_panel"):
+        label_panel = build_label_panel(
+            evaluator_output=evaluator_output,
+            reflector_a=reflector_a_initial,
+            reflector_b=reflector_b_initial,
+            blind_a=blind_a_output,
+            blind_b=blind_b_output,
+            models=agent_models,
+            blind_enabled=blind_enabled,
+        )
     print("\n[Label Panel] Assembling per-clause labels...")
     print(f"  {label_panel['disputed_count']} disputed clause(s).")
     if blind_enabled and label_panel.get("anchoring_summary"):
@@ -200,36 +213,48 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
             if agent1_errors:
                 instructions = build_retry_instructions(agent1_errors)
                 print(f"    Re-running Agent 1 ({len(agent1_errors)} error(s))...")
-                extractor_output = run_extractor(
-                    client, policy_name, policy_text,
-                    model=agent_models["extractor"],
-                    scout_model=agent_models["scout"],
-                    retry_instructions=instructions,
-                )
-                verified_clauses, flagged_clauses = verify_clauses(
-                    extractor_output.get("extracted_clauses", []), policy_text
-                )
+                with trace.step(f"extractor (retry {attempt})", model=agent_models["extractor"]):
+                    extractor_output = run_extractor(
+                        client, policy_name, policy_text,
+                        model=agent_models["extractor"],
+                        scout_model=agent_models["scout"],
+                        retry_instructions=instructions,
+                    )
+                trace.mark_last(status="retry", note=f"re-run: {len(agent1_errors)} Agent-1 error(s)")
+                with trace.step(f"verifier (retry {attempt})"):
+                    verified_clauses, flagged_clauses = verify_clauses(
+                        extractor_output.get("extracted_clauses", []), policy_text
+                    )
+                trace.mark_last(status="retry")
                 retried = True
 
             if agent2_errors:
                 instructions = build_retry_instructions(agent2_errors)
                 print(f"    Re-running Agent 2 ({len(agent2_errors)} error(s))...")
-                evaluator_output = run_evaluator(
-                    client, verified_clauses,
-                    model=agent_models["evaluator"], retry_instructions=instructions
-                )
+                with trace.step(f"evaluator (retry {attempt})", model=agent_models["evaluator"]):
+                    evaluator_output = run_evaluator(
+                        client, verified_clauses,
+                        model=agent_models["evaluator"], retry_instructions=instructions
+                    )
+                trace.mark_last(status="retry", note=f"re-run: {len(agent2_errors)} Agent-2 error(s)")
                 retried = True
 
             if retried:
-                ref_a = run_reflector(
-                    client, verified_clauses, flagged_clauses, evaluator_output,
-                    model=agent_models["reflector_a"]
-                )
-                ref_b = run_reflector(
-                    client, verified_clauses, flagged_clauses, evaluator_output,
-                    model=agent_models["reflector_b"]
-                )
-                final_reflector_output = merge_reflector_outputs(ref_a, ref_b)
+                with trace.step(f"reflector_a (retry {attempt})", model=agent_models["reflector_a"]):
+                    ref_a = run_reflector(
+                        client, verified_clauses, flagged_clauses, evaluator_output,
+                        model=agent_models["reflector_a"]
+                    )
+                trace.mark_last(status="retry")
+                with trace.step(f"reflector_b (retry {attempt})", model=agent_models["reflector_b"]):
+                    ref_b = run_reflector(
+                        client, verified_clauses, flagged_clauses, evaluator_output,
+                        model=agent_models["reflector_b"]
+                    )
+                trace.mark_last(status="retry")
+                with trace.step(f"merge (retry {attempt})"):
+                    final_reflector_output = merge_reflector_outputs(ref_a, ref_b)
+                trace.mark_last(status="retry")
                 final_reflector_output["retry_count"] = attempt
                 retry_count = attempt
 
@@ -253,16 +278,17 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
     # Step 5: Finalizer (Agent 4)
     # ------------------------------------------------------------------
     print("\n[Agent 4] Finalizer — consolidating compliance report...")
-    finalizer_output = run_finalizer(
-        client=client,
-        policy_name=policy_name,
-        extractor_output=extractor_output,
-        verified_clauses=verified_clauses,
-        flagged_clauses=flagged_clauses,
-        evaluator_output=evaluator_output,
-        reflector_output=final_reflector_output,
-        model=agent_models["finalizer"],
-    )
+    with trace.step("finalizer", model=agent_models["finalizer"]):
+        finalizer_output = run_finalizer(
+            client=client,
+            policy_name=policy_name,
+            extractor_output=extractor_output,
+            verified_clauses=verified_clauses,
+            flagged_clauses=flagged_clauses,
+            evaluator_output=evaluator_output,
+            reflector_output=final_reflector_output,
+            model=agent_models["finalizer"],
+        )
     print(f"  Final label: {finalizer_output.get('overall_label')} "
           f"(confidence: {finalizer_output.get('confidence')})")
 
@@ -270,6 +296,7 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
 
     return {
         "run_metadata": run_metadata,
+        "run_trace": trace.events,
         "policy_name": policy_name,
         "agent_models": agent_models,
         "extractor_output": extractor_output,
@@ -322,9 +349,10 @@ def save_result(result: dict, output_dir: Path, run_index: int = 1) -> Path:
 
 
 def _empty_result(policy_name: str, extractor_output: dict, flagged_clauses: list,
-                  run_metadata: dict) -> dict:
+                  run_metadata: dict, run_trace: list) -> dict:
     return {
         "run_metadata": run_metadata,
+        "run_trace": run_trace,
         "policy_name": policy_name,
         "error": "No verified clauses — all extracted clauses failed string-match verification.",
         "extractor_output": extractor_output,
