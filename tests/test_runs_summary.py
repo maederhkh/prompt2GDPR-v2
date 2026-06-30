@@ -30,6 +30,7 @@ def _row(**overrides):
         "blind": "on",
         "anchoring_a": "0.2",
         "anchoring_b": "0.3",
+        "duration_s": "31.7",
     }
     base.update(overrides)
     return base

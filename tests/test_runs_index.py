@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from utils.runs_index import build_index_row, append_run_to_index, FIELDS
+from utils.runs_index import build_index_row, append_run_to_index, FIELDS, MD_HEADERS
 
 
 def _full_result():
@@ -35,6 +35,11 @@ def _full_result():
             },
         },
         "extractor_output": {"extraction_mode": "two_pass"},
+        "run_trace": [
+            {"step": 1, "stage": "extractor", "model": "m1", "duration_s": 16.8, "status": "ok", "note": ""},
+            {"step": 2, "stage": "verifier", "model": None, "duration_s": 0.3, "status": "ok", "note": ""},
+            {"step": 3, "stage": "evaluator", "model": "m2", "duration_s": 14.6, "status": "ok", "note": ""},
+        ],
     }
 
 
@@ -75,6 +80,7 @@ def test_build_index_row_full():
     assert row["blind"] == "on"
     assert row["anchoring_a"] == 0.35
     assert row["anchoring_b"] == 0.37
+    assert row["duration_s"] == 31.7   # 16.8 + 0.3 + 14.6, rounded to 1 dp
 
 
 def test_build_index_row_empty_result():
@@ -92,6 +98,7 @@ def test_build_index_row_empty_result():
     assert row["commit"] == "abc1234"        # no (dirty) suffix
     assert row["anchoring_a"] == "—"     # em dash
     assert row["anchoring_b"] == "—"
+    assert row["duration_s"] == "—"    # no run_trace -> em dash
 
 
 def test_build_index_row_single_pass_coverage():
@@ -99,6 +106,11 @@ def test_build_index_row_single_pass_coverage():
     r["extractor_output"] = {"extraction_mode": "single_pass"}
     row = build_index_row(r)
     assert row["coverage"] == "low"
+
+
+def test_headers_align_with_fields():
+    # MD_HEADERS and FIELDS must stay the same length: one Markdown column per field.
+    assert len(MD_HEADERS) == len(FIELDS), (len(MD_HEADERS), len(FIELDS))
 
 
 def test_append_newest_first():
@@ -158,6 +170,7 @@ if __name__ == "__main__":
     test_build_index_row_full()
     test_build_index_row_empty_result()
     test_build_index_row_single_pass_coverage()
+    test_headers_align_with_fields()
     test_append_newest_first()
     test_schema_mismatch_backs_up()
     print("OK")

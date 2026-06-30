@@ -29,6 +29,7 @@ FIELDS = [
     "blind",
     "anchoring_a",
     "anchoring_b",
+    "duration_s",
 ]
 
 MD_HEADERS = [
@@ -47,6 +48,7 @@ MD_HEADERS = [
     "Blind",
     "Anchoring A",
     "Anchoring B",
+    "Duration (s)",
 ]
 
 EM_DASH = "—"  # — shown when a value is not applicable (e.g. blind disabled)
@@ -92,6 +94,9 @@ def build_index_row(result: dict) -> dict:
     sha = gc.get("sha", "unknown")
     commit = f"{sha} (dirty)" if gc.get("dirty") else sha
 
+    run_trace = result.get("run_trace") or []
+    duration_s = round(sum(e.get("duration_s") or 0 for e in run_trace), 1) if run_trace else EM_DASH
+
     return {
         "run_id": rm.get("run_id", "N/A"),
         "date": _human_date(rm),
@@ -108,6 +113,7 @@ def build_index_row(result: dict) -> dict:
         "blind": "on" if rm.get("blind_enabled") else "off",
         "anchoring_a": _anchoring(lp, "reflector_a"),
         "anchoring_b": _anchoring(lp, "reflector_b"),
+        "duration_s": duration_s,
     }
 
 
