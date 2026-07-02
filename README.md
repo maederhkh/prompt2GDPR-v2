@@ -13,7 +13,7 @@ The system replaces single-prompt LLM evaluation with a structured multi-agent p
 Explore the codebase as an interactive knowledge graph (424 nodes · 727 edges · 24 communities), generated with graphify from the source:
 
 - **🔗 [Interactive graph](https://maederhkh.github.io/prompt2GDPR-v2/graphify-out/graph.html)**: click nodes to inspect, filter by community (served via GitHub Pages)
-- **📄 [Readable report](graphify-out/GRAPH_REPORT.md)** — community hubs, "god nodes", and architecture overview (renders here on GitHub)
+- **📄 [Readable report](graphify-out/GRAPH_REPORT.md)**: community hubs, "god nodes", and architecture overview (renders here on GitHub)
 
 ---
 
@@ -37,7 +37,7 @@ Policy file (.txt / .md / .html / .htm / .pdf / .docx)
       ▼
 [Agent 1 · Pass 1: Scout]
       │  Reads the full policy and classifies each section as include /
-      │  maybe_include / exclude — each decision carries a reason, the
+      │  maybe_include / exclude - each decision carries a reason, the
       │  matched signals, and a confidence level (auditable scout_report;
       │  no extraction, no assessment)
       ▼
@@ -59,7 +59,7 @@ Policy file (.txt / .md / .html / .htm / .pdf / .docx)
       │  internal consistency, Article 89 handling, overall-label derivation
       │  If errors found → retry loop (max 2 retries per agent)
       ▼
-[Blind Labeler A / B]  (optional tier — toggle with --no-blind-labeler)
+[Blind Labeler A / B]  (optional tier - toggle with --no-blind-labeler)
       │  Re-label every clause with the SAME rubric but WITHOUT seeing the
       │  evaluator/reflector output → unanchored "blind" labels
       ▼
@@ -84,7 +84,7 @@ Outputs → output/results/
 
 | Agent | Role | Tools |
 |---|---|---|
-| **Scout** (Agent 1, Pass 1) | Classifies each section as `include` / `maybe_include` / `exclude` for purpose-limitation content — recording a reason, matched signals, and confidence per decision (saved as an auditable `scout_report`) | None |
+| **Scout** (Agent 1, Pass 1) | Classifies each section as `include` / `maybe_include` / `exclude` for purpose-limitation content - recording a reason, matched signals, and confidence per decision (saved as an auditable `scout_report`) | None |
 | **Deep Extractor** (Agent 1, Pass 2) | Extracts verbatim clauses from each scouted section | None |
 | **Evaluator** (Agent 2) | Applies the two-stage GDPR rubric per clause | `get_legal_reference` |
 | **Reflector A & B** (Agent 3) | Independent parallel audit of Agents 1 & 2; drives the retry loop | None |
