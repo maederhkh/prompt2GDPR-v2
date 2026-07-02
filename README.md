@@ -12,7 +12,7 @@ The system replaces single-prompt LLM evaluation with a structured multi-agent p
 
 Explore the codebase as an interactive knowledge graph (424 nodes · 727 edges · 24 communities), generated with graphify from the source:
 
-- **🔗 [Interactive graph](https://maederhkh.github.io/prompt2GDPR-v2/graphify-out/graph.html)** — click nodes to inspect, filter by community (served via GitHub Pages)
+- **🔗 [Interactive graph](https://maederhkh.github.io/prompt2GDPR-v2/graphify-out/graph.html)**: click nodes to inspect, filter by community (served via GitHub Pages)
 - **📄 [Readable report](graphify-out/GRAPH_REPORT.md)** — community hubs, "god nodes", and architecture overview (renders here on GitHub)
 
 ---
