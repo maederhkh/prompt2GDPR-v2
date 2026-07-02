@@ -98,7 +98,7 @@ Outputs → output/results/
 Three mechanisms turn the pipeline from "produces a label" into "produces a label *and reports how much to trust it*":
 
 - **Dual reflectors + merge.** Two independent auditors review the extractor and evaluator outputs in parallel; their findings are merged and an **agreement rate** is recorded. Disagreement lowers final confidence.
-- **Blind-label anchoring measurement.** The Blind Labelers assign a compliance label to every clause using the same rubric but **without** seeing the anchored (evaluator/reflector) labels. The **Label Panel** compares the two and reports a per-reflector **shift rate** — a direct, quantified measure of anchoring bias. Temperature is fixed at `0` for all label-producing calls so a blind-vs-anchored difference reflects the model, not sampling noise. Toggle the tier off with `--no-blind-labeler`.
+- **Blind-label anchoring measurement.** The Blind Labelers assign a compliance label to every clause using the same rubric but **without** seeing the anchored (evaluator/reflector) labels. The **Label Panel** compares the two and reports a per-reflector **shift rate** , a direct, quantified measure of anchoring bias. Temperature is fixed at `0` for all label-producing calls so a blind-vs-anchored difference reflects the model, not sampling noise. Toggle the tier off with `--no-blind-labeler`.
 - **Dispute detection.** When labelers disagree on a clause, the Label Panel marks it `disputed`, the Finalizer downgrades confidence to `low`, and the clause is surfaced for human review — the Evaluator's label is retained as official but never silently.
 
 ---
