@@ -104,6 +104,61 @@ def _render_trace_section(run_trace) -> list:
     return lines
 
 
+def _render_usage_section(token_usage) -> list:
+    """
+    Render the Token Usage & Cost section from a token_usage dict.
+
+    Returns [] when there is nothing to show (token_usage is falsy or its
+    by_stage roll-up is empty). Pure: writes nothing and does not mutate input.
+
+    token_usage shape:
+      {"calls": [...],
+       "by_stage": [{"stage","calls","prompt_tokens","completion_tokens",
+                     "total_tokens","cost"}, ...],
+       "totals": {"calls","prompt_tokens","completion_tokens","total_tokens","cost"}}
+    """
+    if not token_usage:
+        return []
+    by_stage = token_usage.get("by_stage") or []
+    if not by_stage:
+        return []
+
+    def _cell(value) -> str:
+        return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+    def _cost(value) -> str:
+        # OpenRouter cost in USD; em dash when the provider reported none.
+        return f"${value:.4f}" if isinstance(value, (int, float)) and not isinstance(value, bool) else "—"
+
+    totals = token_usage.get("totals") or {}
+    total_calls = totals.get("calls", sum(s.get("calls", 0) for s in by_stage))
+    total_tokens = totals.get("total_tokens", 0)
+    total_cost = totals.get("cost")
+
+    summary = f"- {total_calls} call(s), {total_tokens:,} tokens, {_cost(total_cost)} total"
+
+    lines = [
+        "## Token Usage & Cost",
+        "",
+        summary,
+        "",
+        "| Agent | Calls | Prompt | Completion | Total tokens | Cost (USD) |",
+        "|---|---|---|---|---|---|",
+    ]
+    for s in by_stage:
+        lines.append(
+            f"| {_cell(s.get('stage', ''))} | {s.get('calls', 0)} "
+            f"| {s.get('prompt_tokens', 0):,} | {s.get('completion_tokens', 0):,} "
+            f"| {s.get('total_tokens', 0):,} | {_cost(s.get('cost'))} |"
+        )
+    lines.append(
+        f"| **TOTAL** | {total_calls} | {totals.get('prompt_tokens', 0):,} "
+        f"| {totals.get('completion_tokens', 0):,} | {total_tokens:,} | {_cost(total_cost)} |"
+    )
+    lines.append("")
+    return lines
+
+
 def generate_report(result: dict, out_path: Path) -> None:
     """
     Generate a human-readable markdown report from a pipeline result dict
@@ -470,6 +525,7 @@ def generate_report(result: dict, out_path: Path) -> None:
         lines.append(f"")
 
     lines.extend(_render_trace_section(result.get("run_trace")))
+    lines.extend(_render_usage_section(result.get("token_usage")))
 
     # -----------------------------------------------------------------------
     # Write file
