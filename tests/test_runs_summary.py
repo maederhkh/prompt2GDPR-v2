@@ -13,7 +13,7 @@ from utils.runs_summary import load_index_rows, summarize, build_summary_md, mai
 
 
 def _row(**overrides):
-    """One synthetic index row (all 15 fields, as strings, like the CSV)."""
+    """One synthetic index row (all FIELDS, as strings, like the CSV)."""
     base = {
         "run_id": "20260611T100000Z",
         "date": "2026-06-11 10:00 UTC",
@@ -31,6 +31,8 @@ def _row(**overrides):
         "anchoring_a": "0.2",
         "anchoring_b": "0.3",
         "duration_s": "31.7",
+        "total_tokens": "41000",
+        "cost_usd": "0.0523",
     }
     base.update(overrides)
     return base

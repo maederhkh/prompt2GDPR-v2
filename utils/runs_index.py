@@ -30,6 +30,8 @@ FIELDS = [
     "anchoring_a",
     "anchoring_b",
     "duration_s",
+    "total_tokens",
+    "cost_usd",
 ]
 
 MD_HEADERS = [
@@ -49,6 +51,8 @@ MD_HEADERS = [
     "Anchoring A",
     "Anchoring B",
     "Duration (s)",
+    "Total tokens",
+    "Cost (USD)",
 ]
 
 EM_DASH = "—"  # — shown when a value is not applicable (e.g. blind disabled)
@@ -78,7 +82,7 @@ def _anchoring(label_panel: dict, side_key: str):
 
 def build_index_row(result: dict) -> dict:
     """
-    Map a pipeline result dict to an ordered dict of the 15 index fields.
+    Map a pipeline result dict to an ordered dict of the index fields (see FIELDS).
 
     Defensive throughout: every field falls back to a safe default so a missing
     key (older or empty-result runs) never raises.
@@ -97,6 +101,12 @@ def build_index_row(result: dict) -> dict:
     run_trace = result.get("run_trace") or []
     duration_s = round(sum(e.get("duration_s") or 0 for e in run_trace), 1) if run_trace else EM_DASH
 
+    tu_totals = (result.get("token_usage") or {}).get("totals") or {}
+    tok = tu_totals.get("total_tokens")
+    total_tokens = tok if isinstance(tok, int) and tok else EM_DASH
+    cost = tu_totals.get("cost")
+    cost_usd = round(cost, 4) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else EM_DASH
+
     return {
         "run_id": rm.get("run_id", "N/A"),
         "date": _human_date(rm),
@@ -114,6 +124,8 @@ def build_index_row(result: dict) -> dict:
         "anchoring_a": _anchoring(lp, "reflector_a"),
         "anchoring_b": _anchoring(lp, "reflector_b"),
         "duration_s": duration_s,
+        "total_tokens": total_tokens,
+        "cost_usd": cost_usd,
     }
 
 

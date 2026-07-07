@@ -40,6 +40,12 @@ def _full_result():
             {"step": 2, "stage": "verifier", "model": None, "duration_s": 0.3, "status": "ok", "note": ""},
             {"step": 3, "stage": "evaluator", "model": "m2", "duration_s": 14.6, "status": "ok", "note": ""},
         ],
+        "token_usage": {
+            "calls": [],
+            "by_stage": [],
+            "totals": {"calls": 5, "prompt_tokens": 30000, "completion_tokens": 11000,
+                       "total_tokens": 41000, "cost": 0.0523},
+        },
     }
 
 
@@ -81,6 +87,8 @@ def test_build_index_row_full():
     assert row["anchoring_a"] == 0.35
     assert row["anchoring_b"] == 0.37
     assert row["duration_s"] == 31.7   # 16.8 + 0.3 + 14.6, rounded to 1 dp
+    assert row["total_tokens"] == 41000
+    assert row["cost_usd"] == 0.0523   # round(0.0523, 4)
 
 
 def test_build_index_row_empty_result():
@@ -99,6 +107,8 @@ def test_build_index_row_empty_result():
     assert row["anchoring_a"] == "—"     # em dash
     assert row["anchoring_b"] == "—"
     assert row["duration_s"] == "—"    # no run_trace -> em dash
+    assert row["total_tokens"] == "—"   # no token_usage -> em dash
+    assert row["cost_usd"] == "—"
 
 
 def test_build_index_row_single_pass_coverage():
