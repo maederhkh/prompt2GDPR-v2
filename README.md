@@ -241,6 +241,7 @@ prompt2gdpr_v2/
 │   ├── label_panel.py             # Per-clause label panel + anchoring/dispute computation
 │   ├── legal_tools.py             # Legal reference tool definitions + executor
 │   ├── run_metadata.py            # Per-run provenance (run_id, git, policy hash)
+│   ├── usage_meter.py             # Metered client wrapper + per-stage token/cost capture
 │   ├── runs_index.py              # Cumulative runs index (md + csv)
 │   ├── runs_summary.py            # Aggregate runs summary (analyze_runs.py)
 │   ├── run_diff.py                # Clause-level run comparison (diff_runs.py)
