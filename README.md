@@ -171,8 +171,8 @@ Common options:
 
 Each run writes to `output/results/`:
 
-- **`<policy>_<run_id>.json`** — the full result: all agent outputs (scout, extractor, evaluator, both reflectors, blind labelers, finalizer), the auditable `scout_report` (per-section `include` / `maybe_include` / `exclude` decisions with reason, signals, and confidence), verified/flagged clauses, the label panel, legal references consulted, inter-reflector agreement, anchoring shift rates, M1–M5 evaluation metrics, and run metadata.
-- **`<policy>_<run_id>_report.md`**  a human-readable report, including a Run Metadata block for provenance.
+- **`<policy>_<run_id>.json`** — the full result: all agent outputs (scout, extractor, evaluator, both reflectors, blind labelers, finalizer), the auditable `scout_report` (per-section `include` / `maybe_include` / `exclude` decisions with reason, signals, and confidence), verified/flagged clauses, the label panel, legal references consulted, inter-reflector agreement, anchoring shift rates, M1–M5 evaluation metrics, a `token_usage` block (per-call log, per-stage roll-up, and run totals for tokens and cost), and run metadata.
+- **`<policy>_<run_id>_report.md`**  a human-readable report, including a Run Metadata block for provenance and a **Token Usage & Cost** section — a per-agent table (calls, prompt / completion / total tokens, cost) with a run total. Runs produced before token capture existed simply omit the section.
 - **`runs_index.md` / `runs_index.csv`**  a cumulative index with **one summary row per run** (run ID, policy, commit, overall label, confidence, clause count, agreement rate, retries, disputed count, blind on/off, anchoring shift A/B). The `.md` is for a quick glance; the `.csv` opens directly in Excel/pandas.
 
 In **batch mode** (`--policy-dir`), every policy still produces its own JSON, report, and `runs_index` row exactly as above; additionally one **batch-scoped comparison** is written:
