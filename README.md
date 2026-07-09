@@ -125,9 +125,9 @@ All references consulted are logged in the evaluator output under `references_us
 
 Every run records how many tokens each agent consumed and what it cost — so the reliability numbers above can be read against the price paid to produce them.
 
-- **Transparent metering.** A thin wrapper around the LLM client captures the token usage (and cost) reported on every completion. The agents are untouched: they still make the same calls and read the same responses. Capturing usage can never crash a run — a missing or malformed usage field is simply skipped.
+- **Transparent metering.** A thin wrapper around the LLM client captures the token usage (and cost) reported on every completion. The agents are untouched: they still make the same calls and read the same responses. Capturing usage can never crash a run, a missing or malformed usage field is simply skipped.
 - **Per-agent attribution.** Usage is attributed at pipeline-stage granularity: every LLM call made while a stage is active (including the Scout / Deep / Self-Check sub-calls inside the extractor, and every retry attempt) is booked to that stage. The result carries a `token_usage` block with a per-call log, a per-stage roll-up, and run totals.
-- **Real cost, never estimated.** Cost comes only from what the provider (OpenRouter) reports inline on the response — there is no local price table. If a call reports no cost, it is shown as `—`/`None` rather than guessed.
+- **Real cost, never estimated.** Cost comes only from what the provider (OpenRouter) reports inline on the response, there is no local price table. If a call reports no cost, it is shown as `—`/`None` rather than guessed.
 
 The feature is purely additive: older runs produced before it existed have no `token_usage` and render exactly as they did before.
 
@@ -141,7 +141,7 @@ Run the pipeline on a policy:
 python main.py --policy data/policies/policy_short.txt
 ```
 
-The policy may be plain text (`.txt`/`.md`), HTML (`.html`/`.htm`), PDF (`.pdf`), or Word (`.docx`) — the input loader converts each to clean plain text before the pipeline runs, so the same command works on any of them. (Scanned/image-only PDFs are not supported; OCR is out of scope.)
+The policy may be plain text (`.txt`/`.md`), HTML (`.html`/`.htm`), PDF (`.pdf`), or Word (`.docx`)  the input loader converts each to clean plain text before the pipeline runs, so the same command works on any of them. (Scanned/image-only PDFs are not supported; OCR is out of scope.)
 
 Run a whole folder of policies and get a side-by-side comparison:
 
