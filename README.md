@@ -191,7 +191,7 @@ Two standalone, **on-demand** tools turn the per-run artifacts into research evi
 python analyze_runs.py
 ```
 
-Reads `output/results/runs_index.csv` and writes `output/results/runs_summary.md` — Overall and Per-policy statistics (volume & coverage, compliance outcomes, and reliability: agreement rate, disputes, anchoring). Answers "across every run so far, how stable are the verdicts?".
+Reads `output/results/runs_index.csv` and writes `output/results/runs_summary.md`, Overall and Per-policy statistics (volume & coverage, compliance outcomes, and reliability: agreement rate, disputes, anchoring). Answers "across every run so far, how stable are the verdicts?".
 
 **Clause-level diff of two runs:**
 
