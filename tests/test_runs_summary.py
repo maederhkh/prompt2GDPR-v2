@@ -179,6 +179,52 @@ def test_main_old_schema_writes_nothing():
         shutil.rmtree(d)
 
 
+def test_summarize_cost_and_token_rollup():
+    rows = [
+        _row(cost_usd="0.10", total_tokens="1000"),
+        _row(cost_usd="0.20", total_tokens="3000"),
+    ]
+    s = summarize(rows)
+    assert round(s["cost"]["sum"], 4) == 0.30
+    assert round(s["cost"]["avg"], 4) == 0.15
+    assert s["cost"]["n"] == 2
+    assert s["total_tokens"]["sum"] == 4000
+    assert s["total_tokens"]["avg"] == 2000
+    assert s["total_tokens"]["n"] == 2
+
+
+def test_summarize_cost_partial_data():
+    rows = [
+        _row(cost_usd="0.10", total_tokens="1000"),
+        _row(cost_usd="—", total_tokens="—"),
+    ]
+    s = summarize(rows)
+    assert s["cost"]["n"] == 1
+    assert round(s["cost"]["sum"], 4) == 0.10
+    assert s["total_tokens"]["n"] == 1
+    assert s["total_tokens"]["sum"] == 1000
+
+
+def test_render_cost_and_tokens_section():
+    rows = [
+        _row(cost_usd="0.10", total_tokens="1000"),
+        _row(cost_usd="0.20", total_tokens="3000"),
+    ]
+    md = build_summary_md(rows)
+    assert "Cost & tokens" in md
+    assert "Total cost: $0.3000 (from 2 of 2 runs)" in md
+    assert "Avg cost/run: $0.1500" in md
+    assert "Total tokens: 4,000 (from 2 of 2 runs)" in md
+    assert "Avg tokens/run: 2,000" in md
+
+
+def test_render_cost_and_tokens_no_data():
+    rows = [_row(cost_usd="—", total_tokens="—")]
+    md = build_summary_md(rows)
+    assert "Cost: n/a (0 of 1 runs)" in md
+    assert "Tokens: n/a (0 of 1 runs)" in md
+
+
 if __name__ == "__main__":
     test_summarize_counts_and_averages()
     test_summarize_all_na_column_is_none()
@@ -191,4 +237,8 @@ if __name__ == "__main__":
     test_main_end_to_end()
     test_main_missing_index_writes_nothing()
     test_main_old_schema_writes_nothing()
+    test_summarize_cost_and_token_rollup()
+    test_summarize_cost_partial_data()
+    test_render_cost_and_tokens_section()
+    test_render_cost_and_tokens_no_data()
     print("OK")

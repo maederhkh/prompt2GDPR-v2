@@ -33,6 +33,7 @@ def _num_stats(rows, field):
         "avg": sum(vals) / len(vals),
         "min": min(vals),
         "max": max(vals),
+        "sum": sum(vals),
         "n": len(vals),
     }
 
@@ -93,6 +94,8 @@ def summarize(rows: list) -> dict:
         "disputed_runs": _count_ge1(rows, "disputed"),
         "anchoring_a": _num_stats(rows, "anchoring_a"),
         "anchoring_b": _num_stats(rows, "anchoring_b"),
+        "cost": _num_stats(rows, "cost_usd"),
+        "total_tokens": _num_stats(rows, "total_tokens"),
     }
 
 
@@ -162,6 +165,20 @@ def _render_block(s: dict, h: str) -> list:
         f"- Anchoring shift: A {_avg_with_denominator(s['anchoring_a'], n)}, "
         f"B {_avg_with_denominator(s['anchoring_b'], n)}"
     )
+    lines.append("")
+    lines.append(f"{h} Cost & tokens")
+    cost = s["cost"]
+    if cost is None:
+        lines.append(f"- Cost: n/a (0 of {n} runs)")
+    else:
+        lines.append(f"- Total cost: ${cost['sum']:.4f} (from {cost['n']} of {n} runs)")
+        lines.append(f"- Avg cost/run: ${cost['avg']:.4f}")
+    tok = s["total_tokens"]
+    if tok is None:
+        lines.append(f"- Tokens: n/a (0 of {n} runs)")
+    else:
+        lines.append(f"- Total tokens: {tok['sum']:,.0f} (from {tok['n']} of {n} runs)")
+        lines.append(f"- Avg tokens/run: {tok['avg']:,.0f}")
     return lines
 
 
