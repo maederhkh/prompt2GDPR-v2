@@ -174,6 +174,7 @@ Each run writes to `output/results/`:
 - **`<policy>_<run_id>.json`** — the full result: all agent outputs (scout, extractor, evaluator, both reflectors, blind labelers, finalizer), the auditable `scout_report` (per-section `include` / `maybe_include` / `exclude` decisions with reason, signals, and confidence), verified/flagged clauses, the label panel, legal references consulted, inter-reflector agreement, anchoring shift rates, M1–M5 evaluation metrics, a `token_usage` block (per-call log, per-stage roll-up, and run totals for tokens and cost), and run metadata.
 - **`<policy>_<run_id>_report.md`**  a human-readable report, including a Run Metadata block for provenance and a **Token Usage & Cost** section — a per-agent table (calls, prompt / completion / total tokens, cost) with a run total. Runs produced before token capture existed simply omit the section.
 - **`runs_index.md` / `runs_index.csv`**  a cumulative index with **one summary row per run** (run ID, policy, commit, overall label, confidence, clause count, agreement rate, retries, disputed count, blind on/off, anchoring shift A/B, total duration, total tokens, and cost). The `.md` is for a quick glance; the `.csv` opens directly in Excel/pandas. The index self-migrates: when new columns are added, the old index is backed up to `.bak` and a fresh one is started, and runs missing a value show `—`.
+- **`<policy>_<run_id>_review.md`**  a concise **Human Review Brief** — a reviewer-focused triage artifact that surfaces only the review-critical parts of a run (disputed clauses, unverified/flagged evidence, reflector findings, low-confidence signals, and the legal references used), sorted by priority. It is generated automatically for every run and never blocks a run if it cannot be written. It makes no LLM calls — it re-reads what the run already produced.
 
 In **batch mode** (`--policy-dir`), every policy still produces its own JSON, report, and `runs_index` row exactly as above; additionally one **batch-scoped comparison** is written:
 
@@ -200,6 +201,14 @@ python diff_runs.py <run_a.json> <run_b.json>
 ```
 
 Compares two run JSONs clause by clause and model by model, writing `output/results/diff_<a>_vs_<b>.md`. Because clause IDs are assigned per run, clauses are matched across runs by their verbatim quote text (exact match first, then fuzzy ≥ 90). The diff reports the overall-label / confidence verdicts, a **Models** table (which agent ran which model in each run), **label changes** on matched clauses, clauses **only in one run** (extraction instability), and an unchanged count. If the two runs are for different policies it still produces the diff but prints a loud warning. This is the measuring instrument for run-to-run stability and model-swap experiments.
+
+**Regenerate a review brief for any past run:**
+
+```bash
+python review_run.py output/results/<run>.json
+```
+
+Regenerates the Human Review Brief from an existing run JSON without rerunning the pipeline (read-only, zero LLM calls). Writes `<run>_review.md` next to the JSON; pass `--output PATH` to choose a different destination. If the file is missing or is not a pipeline-run JSON, it prints a readable message and exits cleanly. Use this to produce briefs for runs saved before this feature existed, or to regenerate one after deleting it.
 
 ### Run metadata & reproducibility
 
