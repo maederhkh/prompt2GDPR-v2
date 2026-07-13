@@ -38,6 +38,7 @@ from utils.label_panel import build_label_panel, annotate_finalizer_with_dispute
 from config import DEFAULT_MODEL, DEFAULT_AGENT_MODELS, OPENROUTER_BASE_URL, ENABLE_BLIND_LABELER, LABELER_TEMPERATURE
 from utils.verifier import verify_clauses
 from utils.report_generator import generate_report
+from utils.review_report import write_review_report
 from utils.run_trace import RunTrace
 from utils.usage_meter import UsageMeter, MeteredClient
 from utils.policy_loader import load_policy_text, SUPPORTED_EXTENSIONS, discover_policy_files
@@ -321,6 +322,19 @@ def run_pipeline(client: OpenAI, policy_path: Path, agent_models: dict,
 
 
 
+def _write_review_brief(result: dict, output_dir: Path, stem: str):
+    """Write <stem>_review.md next to the full report. Convenience artifact —
+    a failure here must never fail an otherwise-successful run (mirrors how
+    append_run_to_index treats index failures as non-fatal)."""
+    try:
+        review_path = output_dir / f"{stem}_review.md"
+        write_review_report(result, review_path)
+        return review_path
+    except Exception as exc:  # convenience output must not crash a run
+        print(f"  [warn] could not write review brief: {exc}")
+        return None
+
+
 def save_result(result: dict, output_dir: Path, run_index: int = 1) -> Path:
     """Save a run result to a JSON file, a markdown report, and the cumulative
     runs index (md + csv). Returns the JSON path."""
@@ -344,11 +358,16 @@ def save_result(result: dict, output_dir: Path, run_index: int = 1) -> Path:
     report_path = output_dir / f"{stem}_report.md"
     generate_report(result, report_path)
 
+    # Markdown — reviewer-focused brief (convenience artifact; never fatal)
+    review_path = _write_review_brief(result, output_dir, stem)
+
     # Cumulative runs index — append one summary row per run (md + csv)
     append_run_to_index(result, output_dir)
 
     print(f"\nJSON saved to:   {json_path}")
     print(f"Report saved to: {report_path}")
+    if review_path is not None:
+        print(f"Review saved to: {review_path}")
     return json_path
 
 
