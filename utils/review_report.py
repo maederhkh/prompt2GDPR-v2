@@ -81,7 +81,6 @@ def _build_review_items(
     unresolved_flags = finalizer_output.get("unresolved_flags") or []
     reflector_status = final_reflector_output.get("review_status")
     agreement_rate = final_reflector_output.get("agreement_rate")
-    retries_exhausted = final_reflector_output.get("_retries_exhausted")
     blind_enabled = label_panel.get("blind_labeler_enabled")
     extraction_mode = extractor_output.get("extraction_mode")
 
@@ -399,11 +398,7 @@ def _render_run_context(
         if git_commit.get("dirty") is True:
             commit = f"{commit} (dirty)"
     else:
-        commit = run_metadata.get("git_commit", "N/A")
-        if isinstance(commit, str) and commit and commit != "N/A":
-            commit = commit
-        else:
-            commit = "N/A"
+        commit = git_commit if isinstance(git_commit, str) and git_commit and git_commit != "N/A" else "N/A"
 
     lines.append(f"| Policy | {_cell(policy_name)} |")
     lines.append(f"| Run ID | {_cell(run_metadata.get('run_id', 'N/A'))} |")
