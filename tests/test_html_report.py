@@ -102,6 +102,43 @@ def test_colorize_longest_label_wins():
     assert "label-compliant\"" not in out  # 'Compliant' inside 'Non-Compliant' not separately wrapped
 
 
+def test_cli_writes_html():
+    import json
+    import report_html
+    d = Path(tempfile.mkdtemp())
+    try:
+        j = d / "policy_x_20260101T000000Z.json"
+        j.write_text(json.dumps({"policy_name": "policy_x",
+                                 "finalizer_output": {"overall_label": "Compliant", "confidence": "high"}}),
+                     encoding="utf-8")
+        rc = report_html.main(str(j))
+        assert rc == 0
+        out = d / "policy_x_20260101T000000Z_report.html"
+        assert out.exists()
+        assert "<html" in out.read_text(encoding="utf-8")
+    finally:
+        shutil.rmtree(d)
+
+
+def test_cli_missing_file_is_forgiving():
+    import report_html
+    assert report_html.main("does_not_exist_12345.json") == 0
+
+
+def test_cli_not_a_run_json_writes_nothing():
+    import json
+    import report_html
+    d = Path(tempfile.mkdtemp())
+    try:
+        j = d / "bad.json"
+        j.write_text(json.dumps({"foo": "bar"}), encoding="utf-8")
+        rc = report_html.main(str(j))
+        assert rc == 0
+        assert not (d / "bad_report.html").exists()
+    finally:
+        shutil.rmtree(d)
+
+
 if __name__ == "__main__":
     test_heading_levels()
     test_hr()
@@ -117,4 +154,7 @@ if __name__ == "__main__":
     test_render_html_minimal_does_not_crash()
     test_colorize_only_in_cells_and_headings()
     test_colorize_longest_label_wins()
+    test_cli_writes_html()
+    test_cli_missing_file_is_forgiving()
+    test_cli_not_a_run_json_writes_nothing()
     print("OK")
