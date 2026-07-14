@@ -175,6 +175,7 @@ Each run writes to `output/results/`:
 - **`<policy>_<run_id>_report.md`**  a human-readable report, including a Run Metadata block for provenance and a **Token Usage & Cost** section — a per-agent table (calls, prompt / completion / total tokens, cost) with a run total. Runs produced before token capture existed simply omit the section.
 - **`runs_index.md` / `runs_index.csv`**  a cumulative index with **one summary row per run** (run ID, policy, commit, overall label, confidence, clause count, agreement rate, retries, disputed count, blind on/off, anchoring shift A/B, total duration, total tokens, and cost). The `.md` is for a quick glance; the `.csv` opens directly in Excel/pandas. The index self-migrates: when new columns are added, the old index is backed up to `.bak` and a fresh one is started, and runs missing a value show `—`.
 - **`<policy>_<run_id>_review.md`**  a concise **Human Review Brief** — a reviewer-focused triage artifact that surfaces only the review-critical parts of a run (disputed clauses, unverified/flagged evidence, reflector findings, low-confidence signals, and the legal references used), sorted by priority. It is generated automatically for every run and never blocks a run if it cannot be written. It makes no LLM calls — it re-reads what the run already produced.
+- **`<policy>_<run_id>_report.html`**  a self-contained, browser-viewable HTML rendering of the full report — inlined CSS (no external assets), zebra-striped tables, and color-coded compliance labels. Produced **on demand** (not automatically); see Analysis Tools below.
 
 In **batch mode** (`--policy-dir`), every policy still produces its own JSON, report, and `runs_index` row exactly as above; additionally one **batch-scoped comparison** is written:
 
@@ -209,6 +210,14 @@ python review_run.py output/results/<run>.json
 ```
 
 Regenerates the Human Review Brief from an existing run JSON without rerunning the pipeline (read-only, zero LLM calls). Writes `<run>_review.md` next to the JSON; pass `--output PATH` to choose a different destination. If the file is missing or is not a pipeline-run JSON, it prints a readable message and exits cleanly. Use this to produce briefs for runs saved before this feature existed, or to regenerate one after deleting it.
+
+**Render a run as a shareable HTML page:**
+
+```bash
+python report_html.py output/results/<run>.json
+```
+
+Renders the full per-run report as a single self-contained HTML file (`<run>_report.html`) that opens in any browser with no network — ideal for sharing with reviewers. Read-only, zero LLM calls; reuses the exact Markdown report content, so the HTML stays in step with the `.md`. Pass `--output PATH` to choose a different destination. If the file is missing or is not a pipeline-run JSON, it prints a readable message and exits cleanly.
 
 ### Run metadata & reproducibility
 
