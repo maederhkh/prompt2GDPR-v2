@@ -56,6 +56,52 @@ def test_paragraph():
     assert md_to_html("just text") == "<p>just text</p>"
 
 
+def test_build_markdown_matches_generate_report():
+    from utils.report_generator import generate_report, build_report_markdown
+    result = {"policy_name": "policy_x",
+              "finalizer_output": {"overall_label": "Compliant", "confidence": "high"}}
+    d = Path(tempfile.mkdtemp())
+    try:
+        p = d / "r.md"
+        generate_report(result, p)
+        assert p.read_text(encoding="utf-8") == build_report_markdown(result)
+    finally:
+        shutil.rmtree(d)
+
+
+def test_render_html_full():
+    from utils.html_report import render_html_report
+    result = {"policy_name": "policy_x",
+              "finalizer_output": {"overall_label": "Partially Compliant", "confidence": "medium"}}
+    html = render_html_report(result)
+    assert html.startswith("<!doctype html>")
+    assert "<title>GDPR Assessment — policy_x</title>" in html
+    assert "<style>" in html
+    assert "<table>" in html
+    assert 'class="label label-partial"' in html
+
+
+def test_render_html_minimal_does_not_crash():
+    from utils.html_report import render_html_report
+    html = render_html_report({"policy_name": "p", "finalizer_output": {}})
+    assert "<html" in html and "</html>" in html
+
+
+def test_colorize_only_in_cells_and_headings():
+    from utils.html_report import _colorize_labels
+    body = "<p>Compliant policies vary</p><td><strong>Compliant</strong></td>"
+    out = _colorize_labels(body)
+    assert '<td><strong><span class="label label-compliant">Compliant</span></strong></td>' in out
+    assert "<p>Compliant policies vary</p>" in out  # prose untouched
+
+
+def test_colorize_longest_label_wins():
+    from utils.html_report import _colorize_labels
+    out = _colorize_labels("<h4>C1 — Non-Compliant</h4>")
+    assert 'class="label label-noncompliant">Non-Compliant</span>' in out
+    assert "label-compliant\"" not in out  # 'Compliant' inside 'Non-Compliant' not separately wrapped
+
+
 if __name__ == "__main__":
     test_heading_levels()
     test_hr()
@@ -66,4 +112,9 @@ if __name__ == "__main__":
     test_table()
     test_table_escaped_pipe_stays_one_cell()
     test_paragraph()
+    test_build_markdown_matches_generate_report()
+    test_render_html_full()
+    test_render_html_minimal_does_not_crash()
+    test_colorize_only_in_cells_and_headings()
+    test_colorize_longest_label_wins()
     print("OK")
