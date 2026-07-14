@@ -159,10 +159,10 @@ def _render_usage_section(token_usage) -> list:
     return lines
 
 
-def generate_report(result: dict, out_path: Path) -> None:
+def build_report_markdown(result: dict) -> str:
     """
-    Generate a human-readable markdown report from a pipeline result dict
-    and write it to out_path.
+    Build the human-readable markdown report from a pipeline result dict and
+    return it as a string. Pure: writes nothing.
     """
     finalizer = result.get("finalizer_output", {})
     evaluator = result.get("evaluator_output", {})
@@ -530,4 +530,9 @@ def generate_report(result: dict, out_path: Path) -> None:
     # -----------------------------------------------------------------------
     # Write file
     # -----------------------------------------------------------------------
-    out_path.write_text("\n".join(lines), encoding="utf-8")
+    return "\n".join(lines)
+
+
+def generate_report(result: dict, out_path: Path) -> None:
+    """Write the markdown report for `result` to out_path."""
+    out_path.write_text(build_report_markdown(result), encoding="utf-8")
